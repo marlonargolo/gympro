@@ -1,0 +1,14 @@
+{
+  "name": "gympro-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "student": "cd apps/student && npx expo start",
+    "pro": "cd apps/pro && npx expo start",
+    "typecheck": "tsc --noEmit -p apps/student/tsconfig.json && tsc --noEmit -p apps/pro/tsconfig.json"
+  }
+}
