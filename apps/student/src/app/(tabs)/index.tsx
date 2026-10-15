@@ -1,120 +1,141 @@
+// HomeView — faithful port of Views/HomeView.swift
+import React from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
+  ScrollView, View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { useStore } from '../../context/StoreContext';
+import { calcularTMB, calcularGET } from '../../data/calculators';
 
-const QUICK_STATS = [
-  { label: 'Treinos este mês', value: '12', icon: '🔥' },
-  { label: 'Horas ativas', value: '18h', icon: '⏱️' },
-  { label: 'Calorias totais', value: '4.2k', icon: '⚡' },
-];
+type ShortcutDef = {
+  title: string;
+  subtitle: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  route: string;
+};
 
-const RECENT_WORKOUTS = [
-  { name: 'Peito & Tríceps', duration: '55 min', date: 'Hoje' },
-  { name: 'Costas & Bíceps', duration: '50 min', date: 'Ontem' },
-  { name: 'Pernas', duration: '65 min', date: '3 dias atrás' },
+const shortcuts: ShortcutDef[] = [
+  { title: 'Música no treino', subtitle: 'Spotify / YouTube', icon: 'musical-notes', route: '/music' },
+  { title: 'Notificações no relógio', subtitle: 'Apple Watch (mock)', icon: 'watch', route: '/sleep' },
+  { title: 'Melhoria do sono', subtitle: 'Análise e dicas', icon: 'moon', route: '/sleep' },
+  { title: 'Profissionais', subtitle: 'Perto de você', icon: 'people', route: '/maps' },
+  { title: 'Nutricionistas', subtitle: 'Especialistas esportivos', icon: 'medkit', route: '/nutritionists' },
 ];
 
 export default function HomeScreen() {
+  const { perfil } = useStore();
+  const tmb = Math.round(calcularTMB(perfil));
+  const get = Math.round(calcularGET(perfil));
+  const nomeDisplay = perfil.nome.trim() || 'Atleta';
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Olá, Atleta 👋</Text>
-          <Text style={styles.subtitle}>Pronto para treinar hoje?</Text>
+    <SafeAreaView style={s.safe}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={s.greeting}>Olá, {nomeDisplay}</Text>
+
+        {/* Taxa Metabólica Basal card */}
+        <View style={s.card}>
+          <View style={s.cardTitleRow}>
+            <Ionicons name="flame" size={18} color={Colors.primary} />
+            <Text style={s.cardTitle}> Sua Taxa Metabólica Basal</Text>
+          </View>
+          <View style={s.metabolicRow}>
+            <View>
+              <Text style={s.metaLabel}>TMB (repouso)</Text>
+              <Text style={s.metaValue}>{tmb} kcal</Text>
+            </View>
+            <View>
+              <Text style={s.metaLabel}>Gasto total/dia</Text>
+              <Text style={[s.metaValue, { color: Colors.primary }]}>{get} kcal</Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => router.navigate('/(tabs)/profile')}>
+            <Text style={s.editLink}>Editar perfil e recalcular →</Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.startButton}>
-          <Text style={styles.startButtonText}>▶ Iniciar Treino</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Resumo do Mês</Text>
-        <View style={styles.statsRow}>
-          {QUICK_STATS.map((stat) => (
-            <View key={stat.label} style={styles.statCard}>
-              <Text style={styles.statIcon}>{stat.icon}</Text>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
+        {/* Shortcut cards 2x2 grid */}
+        <View style={s.grid}>
+          {shortcuts.map((item) => (
+            <TouchableOpacity
+              key={item.title}
+              style={s.shortcut}
+              onPress={() => router.navigate(item.route as any)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={item.icon} size={28} color={Colors.primary} />
+              <Text style={s.shortcutTitle}>{item.title}</Text>
+              <Text style={s.shortcutSub}>{item.subtitle}</Text>
+            </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Treinos Recentes</Text>
-        {RECENT_WORKOUTS.map((workout) => (
-          <TouchableOpacity key={workout.name} style={styles.workoutCard}>
+        {/* Health calculators shortcut */}
+        <TouchableOpacity
+          style={[s.card, s.calcCard]}
+          onPress={() => router.navigate('/health-calculators')}
+          activeOpacity={0.8}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="calculator" size={22} color={Colors.accent} />
             <View>
-              <Text style={styles.workoutName}>{workout.name}</Text>
-              <Text style={styles.workoutMeta}>
-                {workout.duration} · {workout.date}
-              </Text>
+              <Text style={[s.shortcutTitle, { color: Colors.text }]}>Calculadoras de Saúde</Text>
+              <Text style={s.shortcutSub}>IMC · água · FC · macros</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        ))}
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} style={{ marginLeft: 'auto' }} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.card, s.calcCard]}
+          onPress={() => router.navigate('/marketplace')}
+          activeOpacity={0.8}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="cart" size={22} color={Colors.primary2} />
+            <View>
+              <Text style={[s.shortcutTitle, { color: Colors.text }]}>Marketplace</Text>
+              <Text style={s.shortcutSub}>Suplementos e parceiros</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} style={{ marginLeft: 'auto' }} />
+          </View>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, paddingHorizontal: 16 },
-  header: { marginTop: 24, marginBottom: 20 },
-  greeting: { fontSize: 26, fontWeight: '700', color: Colors.text },
-  subtitle: { fontSize: 15, color: Colors.textMuted, marginTop: 4 },
-  startButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  startButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 28,
-  },
-  statCard: {
-    flex: 1,
+  scroll: { padding: 18, paddingBottom: 32, gap: 16 },
+  greeting: { fontSize: 26, fontWeight: '700', color: Colors.text, marginBottom: 4 },
+  card: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
+    gap: 12,
   },
-  statIcon: { fontSize: 22, marginBottom: 6 },
-  statValue: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  statLabel: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  workoutCard: {
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  cardTitle: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  metabolicRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  metaLabel: { fontSize: 12, color: Colors.textSecondary },
+  metaValue: { fontSize: 22, fontWeight: '700', color: Colors.text },
+  editLink: { fontSize: 13, color: Colors.primary, fontWeight: '500' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  shortcut: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    width: '47%',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
+    gap: 8,
   },
-  workoutName: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  workoutMeta: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
-  chevron: { fontSize: 22, color: Colors.textMuted },
+  shortcutTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  shortcutSub: { fontSize: 12, color: Colors.textSecondary },
+  calcCard: { gap: 0 },
 });

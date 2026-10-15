@@ -1,171 +1,144 @@
+// WorkoutListView — faithful port of Views/Workout/WorkoutListView.swift
+import React, { useState } from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, FlatList,
 } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { useStore } from '../../context/StoreContext';
+import type { ModalidadeAtleta } from '../../data/types';
+import { modalidadeLabel } from '../../data/types';
 
-const CATEGORIES = ['Todos', 'Força', 'Cardio', 'Flexibilidade', 'HIIT'];
-
-const WORKOUTS = [
-  {
-    name: 'Peito & Tríceps',
-    exercises: 8,
-    duration: '55 min',
-    level: 'Intermediário',
-    emoji: '💪',
-  },
-  {
-    name: 'Costas & Bíceps',
-    exercises: 7,
-    duration: '50 min',
-    level: 'Intermediário',
-    emoji: '🏋️',
-  },
-  {
-    name: 'Pernas Completo',
-    exercises: 10,
-    duration: '65 min',
-    level: 'Avançado',
-    emoji: '🦵',
-  },
-  {
-    name: 'HIIT Cardio',
-    exercises: 6,
-    duration: '30 min',
-    level: 'Avançado',
-    emoji: '🔥',
-  },
-  {
-    name: 'Ombros & Trapézio',
-    exercises: 6,
-    duration: '45 min',
-    level: 'Iniciante',
-    emoji: '🏆',
-  },
-  {
-    name: 'Core & Abdômen',
-    exercises: 5,
-    duration: '25 min',
-    level: 'Iniciante',
-    emoji: '⚡',
-  },
+const allModalidades: ModalidadeAtleta[] = [
+  'corredor', 'futebol', 'musculacao', 'ciclista', 'natacao', 'crossTraining',
 ];
 
-const LEVEL_COLORS: Record<string, string> = {
-  Iniciante: Colors.success,
-  Intermediário: Colors.warning,
-  Avançado: Colors.primary,
+const duracaoColor = (min: number) => {
+  if (min < 45) return Colors.success;
+  if (min < 60) return Colors.primary2;
+  return Colors.primary;
 };
 
 export default function WorkoutsScreen() {
+  const { treinos } = useStore();
+  const [filtro, setFiltro] = useState<ModalidadeAtleta | null>(null);
+
+  const treinosFiltrados = filtro ? treinos.filter(t => t.modalidade === filtro) : treinos;
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Treinos</Text>
+    <SafeAreaView style={s.safe}>
+      {/* Header */}
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Treinos</Text>
+        <TouchableOpacity onPress={() => router.navigate('/training-methods')}>
+          <Text style={s.methodsLink}>Métodos</Text>
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesScroll}
-          contentContainerStyle={styles.categoriesContent}
-        >
-          {CATEGORIES.map((cat, i) => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.categoryPill, i === 0 && styles.categoryPillActive]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  i === 0 && styles.categoryTextActive,
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.chipsRow}
+      >
+        <FilterChip titulo="Todos" ativo={filtro === null} onPress={() => setFiltro(null)} />
+        {allModalidades.map(m => (
+          <FilterChip
+            key={m}
+            titulo={modalidadeLabel[m]}
+            ativo={filtro === m}
+            onPress={() => setFiltro(m)}
+          />
+        ))}
+      </ScrollView>
 
-        <View style={styles.grid}>
-          {WORKOUTS.map((w) => (
-            <TouchableOpacity key={w.name} style={styles.card}>
-              <Text style={styles.cardEmoji}>{w.emoji}</Text>
-              <Text style={styles.cardName}>{w.name}</Text>
-              <Text style={styles.cardMeta}>
-                {w.exercises} exercícios · {w.duration}
+      {/* Workout list */}
+      <FlatList
+        data={treinosFiltrados}
+        keyExtractor={item => item.id}
+        contentContainerStyle={s.list}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={s.card}
+            onPress={() => router.navigate(`/workout/${item.id}` as any)}
+            activeOpacity={0.8}
+          >
+            <View style={s.cardLeft}>
+              <Text style={s.cardTitle}>{item.titulo}</Text>
+              <Text style={s.cardSub}>
+                {modalidadeLabel[item.modalidade]} · {item.duracaoEstimadaMin} min · {item.nivel}
               </Text>
-              <View
-                style={[
-                  styles.levelBadge,
-                  { backgroundColor: LEVEL_COLORS[w.level] + '22' },
-                ]}
-              >
-                <Text
-                  style={[styles.levelText, { color: LEVEL_COLORS[w.level] }]}
-                >
-                  {w.level}
+              <Text style={s.exCount}>{item.exercicios.length} exercício{item.exercicios.length !== 1 ? 's' : ''}</Text>
+            </View>
+            <View style={s.cardRight}>
+              <View style={[s.badge, { backgroundColor: duracaoColor(item.duracaoEstimadaMin) + '22' }]}>
+                <Text style={[s.badgeText, { color: duracaoColor(item.duracaoEstimadaMin) }]}>
+                  {item.duracaoEstimadaMin}min
                 </Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+            </View>
+          </TouchableOpacity>
+        )}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function FilterChip({ titulo, ativo, onPress }: { titulo: string; ativo: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[s.chip, ativo && s.chipAtivo]}
+      activeOpacity={0.7}
+    >
+      <Text style={[s.chipText, ativo && s.chipTextAtivo]}>{titulo}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, paddingHorizontal: 16 },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: Colors.text,
-    marginTop: 24,
-    marginBottom: 16,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  categoriesScroll: { marginBottom: 20 },
-  categoriesContent: { gap: 8, paddingRight: 16 },
-  categoryPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  headerTitle: { fontSize: 26, fontWeight: '700', color: Colors.text },
+  methodsLink: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
+  chipsRow: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     backgroundColor: Colors.surface,
+    borderRadius: 100,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  categoryPillActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  categoryText: { color: Colors.textMuted, fontSize: 14 },
-  categoryTextActive: { color: '#fff', fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 24 },
+  chipAtivo: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  chipText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  chipTextAtivo: { color: '#FFF' },
+  list: { padding: 16, gap: 12 },
   card: {
-    width: '47%',
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  cardEmoji: { fontSize: 28, marginBottom: 10 },
-  cardName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  cardMeta: { fontSize: 12, color: Colors.textMuted, marginBottom: 10 },
-  levelBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  levelText: { fontSize: 11, fontWeight: '600' },
+  cardLeft: { flex: 1, gap: 4 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  cardSub: { fontSize: 13, color: Colors.textSecondary },
+  exCount: { fontSize: 12, color: Colors.textTertiary },
+  cardRight: { alignItems: 'center', gap: 8 },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  badgeText: { fontSize: 12, fontWeight: '700' },
 });
