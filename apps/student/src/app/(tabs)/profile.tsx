@@ -1,188 +1,232 @@
+// ProfileView — faithful port of Views/ProfileView.swift
+import React from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  SafeAreaView,
+  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { useStore } from '../../context/StoreContext';
+import { calcularTMB, calcularGET } from '../../data/calculators';
+import type { NivelAtividade, ModalidadeAtleta, Sexo } from '../../data/types';
+import { nivelAtividadeLabel, modalidadeLabel } from '../../data/types';
 
-const STATS = [
-  { label: 'Treinos', value: '124' },
-  { label: 'Seguidores', value: '48' },
-  { label: 'Seguindo', value: '32' },
-];
-
-const MENU_ITEMS = [
-  { icon: '🎯', label: 'Metas & Objetivos' },
-  { icon: '📊', label: 'Histórico de Progresso' },
-  { icon: '🏅', label: 'Conquistas' },
-  { icon: '🔔', label: 'Notificações' },
-  { icon: '🔒', label: 'Privacidade' },
-  { icon: '⚙️', label: 'Configurações' },
-  { icon: '❓', label: 'Suporte' },
-];
+const sexos: Sexo[] = ['masculino', 'feminino'];
+const niveis: NivelAtividade[] = ['sedentario', 'leve', 'moderado', 'ativo', 'muitoAtivo'];
+const modalidades: ModalidadeAtleta[] = ['corredor', 'futebol', 'musculacao', 'ciclista', 'natacao', 'crossTraining'];
 
 export default function ProfileScreen() {
+  const { perfil, setPerfil } = useStore();
+  const tmb = Math.round(calcularTMB(perfil));
+  const get = Math.round(calcularGET(perfil));
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>MA</Text>
-          </View>
-          <Text style={styles.name}>Marlon Argolo</Text>
-          <Text style={styles.handle}>@marlonargolo</Text>
+    <SafeAreaView style={s.safe}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+        <Text style={s.title}>Perfil</Text>
 
-          <View style={styles.statsRow}>
-            {STATS.map((stat, i) => (
-              <View key={stat.label} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-                {i < STATS.length - 1 && <View style={styles.statDivider} />}
-              </View>
-            ))}
-          </View>
+        {/* Dados pessoais */}
+        <Section title="Dados pessoais">
+          <FormField label="Nome">
+            <TextInput
+              style={s.input}
+              value={perfil.nome}
+              onChangeText={v => setPerfil({ ...perfil, nome: v })}
+              placeholder="Seu nome"
+              placeholderTextColor={Colors.textTertiary}
+            />
+          </FormField>
 
-          <TouchableOpacity style={styles.editProfileBtn}>
-            <Text style={styles.editProfileText}>Editar Perfil</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Objetivo</Text>
-            <Text style={styles.infoValue}>Hipertrofia</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nível</Text>
-            <Text style={styles.infoValue}>Intermediário</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Plano</Text>
-            <Text style={[styles.infoValue, { color: Colors.primary }]}>
-              Pro ⭐
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.menuCard}>
-          {MENU_ITEMS.map((item, i) => (
-            <View key={item.label}>
-              <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuIcon}>{item.icon}</Text>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.menuChevron}>›</Text>
-              </TouchableOpacity>
-              {i < MENU_ITEMS.length - 1 && <View style={styles.divider} />}
+          <FormField label="Sexo">
+            <View style={s.segmented}>
+              {sexos.map(s_ => (
+                <TouchableOpacity
+                  key={s_}
+                  style={[s.seg, perfil.sexo === s_ && s.segAtivo]}
+                  onPress={() => setPerfil({ ...perfil, sexo: s_ })}
+                >
+                  <Text style={[s.segText, perfil.sexo === s_ && s.segTextAtivo]}>
+                    {s_ === 'masculino' ? 'Masculino' : 'Feminino'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          ))}
-        </View>
+          </FormField>
 
-        <TouchableOpacity style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Sair da Conta</Text>
-        </TouchableOpacity>
+          <FormField label={`Idade: ${perfil.idade} anos`}>
+            <View style={s.stepper}>
+              <TouchableOpacity
+                style={s.stepBtn}
+                onPress={() => setPerfil({ ...perfil, idade: Math.max(10, perfil.idade - 1) })}
+              >
+                <Ionicons name="remove" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+              <Text style={s.stepVal}>{perfil.idade}</Text>
+              <TouchableOpacity
+                style={s.stepBtn}
+                onPress={() => setPerfil({ ...perfil, idade: Math.min(90, perfil.idade + 1) })}
+              >
+                <Ionicons name="add" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </FormField>
+        </Section>
+
+        {/* Medidas */}
+        <Section title="Medidas">
+          <FormField label="Peso (kg)">
+            <TextInput
+              style={s.input}
+              value={String(perfil.pesoKg)}
+              onChangeText={v => setPerfil({ ...perfil, pesoKg: parseFloat(v) || perfil.pesoKg })}
+              keyboardType="decimal-pad"
+              placeholder="kg"
+              placeholderTextColor={Colors.textTertiary}
+            />
+          </FormField>
+          <FormField label="Altura (cm)">
+            <TextInput
+              style={s.input}
+              value={String(perfil.alturaCm)}
+              onChangeText={v => setPerfil({ ...perfil, alturaCm: parseFloat(v) || perfil.alturaCm })}
+              keyboardType="decimal-pad"
+              placeholder="cm"
+              placeholderTextColor={Colors.textTertiary}
+            />
+          </FormField>
+        </Section>
+
+        {/* Atividade e modalidade */}
+        <Section title="Atividade e modalidade">
+          <Text style={s.fieldLabel}>Nível de atividade</Text>
+          {niveis.map(n => (
+            <TouchableOpacity
+              key={n}
+              style={[s.listOption, perfil.nivelAtividade === n && s.listOptionAtivo]}
+              onPress={() => setPerfil({ ...perfil, nivelAtividade: n })}
+            >
+              <Text style={[s.listOptionText, perfil.nivelAtividade === n && s.listOptionTextAtivo]}>
+                {nivelAtividadeLabel[n]}
+              </Text>
+              {perfil.nivelAtividade === n && (
+                <Ionicons name="checkmark" size={16} color={Colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+
+          <Text style={[s.fieldLabel, { marginTop: 12 }]}>Modalidade principal</Text>
+          {modalidades.map(m => (
+            <TouchableOpacity
+              key={m}
+              style={[s.listOption, perfil.modalidadePrincipal === m && s.listOptionAtivo]}
+              onPress={() => setPerfil({ ...perfil, modalidadePrincipal: m })}
+            >
+              <Text style={[s.listOptionText, perfil.modalidadePrincipal === m && s.listOptionTextAtivo]}>
+                {modalidadeLabel[m]}
+              </Text>
+              {perfil.modalidadePrincipal === m && (
+                <Ionicons name="checkmark" size={16} color={Colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </Section>
+
+        {/* Resultado */}
+        <Section title="Resultado">
+          <View style={s.resultRow}>
+            <Text style={s.resultLabel}>TMB</Text>
+            <Text style={s.resultValue}>{tmb} kcal/dia</Text>
+          </View>
+          <View style={s.resultRow}>
+            <Text style={s.resultLabel}>Gasto total estimado</Text>
+            <Text style={[s.resultValue, { color: Colors.primary }]}>{get} kcal/dia</Text>
+          </View>
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={ss.section}>
+      <Text style={ss.sectionTitle}>{title}</Text>
+      <View style={ss.sectionBody}>{children}</View>
+    </View>
+  );
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={ss.field}>
+      <Text style={ss.fieldLabel}>{label}</Text>
+      {children}
+    </View>
+  );
+}
+
+const ss = StyleSheet.create({
+  section: { gap: 8 },
+  sectionTitle: {
+    fontSize: 13, fontWeight: '700', color: Colors.textTertiary,
+    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4,
+  },
+  sectionBody: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    gap: 12,
+  },
+  field: { gap: 6 },
+  fieldLabel: { fontSize: 13, color: Colors.textSecondary },
+});
+
+const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1, paddingHorizontal: 16 },
-  profileHeader: {
-    alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 20,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
-  name: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  handle: { fontSize: 14, color: Colors.textMuted, marginTop: 2, marginBottom: 20 },
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    width: '100%',
-    justifyContent: 'space-around',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 16,
-  },
-  statItem: { alignItems: 'center', flex: 1, position: 'relative' },
-  statValue: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  statLabel: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
-  statDivider: {
-    position: 'absolute',
-    right: 0,
-    top: 4,
-    bottom: 4,
-    width: 1,
-    backgroundColor: Colors.border,
-  },
-  editProfileBtn: {
-    borderWidth: 1,
-    borderColor: Colors.border,
+  scroll: { padding: 18, gap: 20, paddingBottom: 40 },
+  title: { fontSize: 26, fontWeight: '700', color: Colors.text },
+  fieldLabel: { fontSize: 13, color: Colors.textSecondary, marginBottom: 4 },
+  input: {
+    backgroundColor: Colors.surfaceElevated,
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-  },
-  editProfileText: { color: Colors.text, fontWeight: '600' },
-  infoCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
+    padding: 12,
+    color: Colors.text,
+    fontSize: 15,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  infoRow: {
+  segmented: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', gap: 4 },
+  seg: {
+    flex: 1, padding: 10, alignItems: 'center',
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 8,
+  },
+  segAtivo: { backgroundColor: Colors.primary },
+  segText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+  segTextAtivo: { color: '#FFF' },
+  stepper: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: Colors.surfaceElevated, borderRadius: 10, padding: 8,
+    alignSelf: 'flex-start',
+  },
+  stepBtn: { padding: 6 },
+  stepVal: { fontSize: 18, fontWeight: '700', color: Colors.text, minWidth: 36, textAlign: 'center' },
+  listOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  infoLabel: { color: Colors.textMuted, fontSize: 15 },
-  infoValue: { color: Colors.text, fontWeight: '600', fontSize: 15 },
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
-  menuCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  menuIcon: { fontSize: 20 },
-  menuLabel: { flex: 1, color: Colors.text, fontSize: 15 },
-  menuChevron: { fontSize: 22, color: Colors.textMuted },
-  logoutBtn: {
-    backgroundColor: Colors.primary + '18',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: Colors.primary + '44',
-  },
-  logoutText: { color: Colors.primary, fontWeight: '600', fontSize: 16 },
+  listOptionAtivo: { borderColor: Colors.primary, backgroundColor: Colors.primary + '18' },
+  listOptionText: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
+  listOptionTextAtivo: { color: Colors.text, fontWeight: '600' },
+  resultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  resultLabel: { fontSize: 14, color: Colors.textSecondary },
+  resultValue: { fontSize: 16, fontWeight: '700', color: Colors.text },
 });
