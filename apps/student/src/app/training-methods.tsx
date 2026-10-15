@@ -1,83 +1,199 @@
-// TrainingMethodsListView + detail — port of Views/Workout/TrainingMethodsView.swift
+// TrainingMethodsScreen — premium dark UI rewrite
 import React, { useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { allMetodos, metodoTreinamentoInfo } from '../data/types';
 import type { MetodoTreinamento } from '../data/types';
 
-export default function TrainingMethodsScreen() {
-  const [selected, setSelected] = useState<MetodoTreinamento | null>(null);
-  const info = selected ? metodoTreinamentoInfo[selected] : null;
+type LevelFilter = 'Todos' | 'Iniciante' | 'Avançado';
 
-  if (selected && info) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <ScrollView contentContainerStyle={s.detailContent}>
-          <TouchableOpacity onPress={() => setSelected(null)} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={20} color={Colors.primary} />
-            <Text style={s.backText}>Todos os métodos</Text>
-          </TouchableOpacity>
-          <Text style={s.detailTitle}>{info.titulo}</Text>
-          <View style={s.nivelBadge}>
-            <Ionicons name="stats-chart" size={14} color={Colors.primary} />
-            <Text style={s.nivelText}> {info.nivelRecomendado}</Text>
-          </View>
-          <Text style={s.detailDesc}>{info.descricao}</Text>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+const FEATURED: MetodoTreinamento[] = ['dropSet', 'gvt', 'heavyDuty'];
+
+function getLevelColor(nivel: string): string {
+  if (nivel.toLowerCase().includes('avançado')) return Colors.primary;
+  if (nivel.toLowerCase().includes('intermediário') && !nivel.toLowerCase().includes('iniciante')) return Colors.primary2;
+  return Colors.success;
+}
+
+function matchesFilter(nivel: string, filter: LevelFilter): boolean {
+  if (filter === 'Todos') return true;
+  if (filter === 'Iniciante') return nivel.toLowerCase().includes('iniciante');
+  if (filter === 'Avançado') return nivel.toLowerCase().includes('avançado');
+  return true;
+}
+
+export default function TrainingMethodsScreen() {
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>('Todos');
+  const [expandedMethod, setExpandedMethod] = useState<MetodoTreinamento | null>(null);
+
+  const filters: LevelFilter[] = ['Todos', 'Iniciante', 'Avançado'];
+
+  const filtered = allMetodos.filter(m =>
+    matchesFilter(metodoTreinamentoInfo[m].nivelRecomendado, levelFilter)
+  );
 
   return (
     <SafeAreaView style={s.safe}>
-      <FlatList
-        data={allMetodos}
-        keyExtractor={m => m}
-        contentContainerStyle={s.list}
-        renderItem={({ item }) => {
-          const info = metodoTreinamentoInfo[item];
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+
+        {/* Header */}
+        <View style={s.header}>
+          <View>
+            <Text style={s.headerTitle}>Métodos de Treino</Text>
+            <Text style={s.headerSub}>Técnicas avançadas de intensidade</Text>
+          </View>
+          <View style={s.countBadge}>
+            <Text style={s.countBadgeText}>{filtered.length}</Text>
+          </View>
+        </View>
+
+        {/* Level filter tabs */}
+        <View style={s.filterRow}>
+          {filters.map(f => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setLevelFilter(f)}
+              style={[s.filterTab, levelFilter === f && s.filterTabActive]}
+              activeOpacity={0.75}
+            >
+              <Text style={[s.filterTabText, levelFilter === f && s.filterTabTextActive]}>
+                {f}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Method cards */}
+        {filtered.map(method => {
+          const info = metodoTreinamentoInfo[method];
+          const isFeatured = FEATURED.includes(method);
+          const isExpanded = expandedMethod === method;
+          const levelColor = getLevelColor(info.nivelRecomendado);
+
           return (
             <TouchableOpacity
-              style={s.row}
-              onPress={() => setSelected(item)}
+              key={method}
+              onPress={() => setExpandedMethod(isExpanded ? null : method)}
+              style={[s.methodCard, isFeatured && s.featuredCard]}
               activeOpacity={0.8}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={s.rowTitle}>{info.titulo}</Text>
-                <Text style={s.rowLevel}>{info.nivelRecomendado}</Text>
+              {isFeatured && <View style={s.featuredStrip} />}
+              <View style={s.methodCardInner}>
+                {/* Row 1: title + level badge */}
+                <View style={s.methodRow1}>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {isFeatured && (
+                      <View style={s.starBadge}>
+                        <Ionicons name="star" size={10} color={Colors.primary} />
+                      </View>
+                    )}
+                    <Text style={s.methodTitle} numberOfLines={isExpanded ? undefined : 1}>
+                      {info.titulo}
+                    </Text>
+                  </View>
+                  <View style={[s.levelBadge, { backgroundColor: levelColor + '25', borderColor: levelColor + '50' }]}>
+                    <Text style={[s.levelBadgeText, { color: levelColor }]}>
+                      {info.nivelRecomendado}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Row 2: description */}
+                <Text style={s.methodDesc} numberOfLines={isExpanded ? undefined : 2}>
+                  {info.descricao}
+                </Text>
+
+                {/* Expand indicator */}
+                <View style={s.expandRow}>
+                  <Text style={s.expandHint}>{isExpanded ? 'Recolher' : 'Ver mais'}</Text>
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color={Colors.textTertiary}
+                  />
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
             </TouchableOpacity>
           );
-        }}
-      />
+        })}
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  list: { padding: 16, gap: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  scroll: { padding: 18, gap: 14, paddingBottom: 48 },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingBottom: 4,
+  },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.text },
+  headerSub: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  countBadge: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.primary + '25',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.primary + '50',
+  },
+  countBadgeText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filterTab: {
+    flex: 1, paddingVertical: 10, borderRadius: 12,
+    backgroundColor: Colors.surfaceElevated,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  filterTabActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowRadius: 8,
+    shadowOpacity: 0.4,
+    elevation: 4,
+  },
+  filterTabText: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
+  filterTabTextActive: { color: '#FFF' },
+
+  methodCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
+    overflow: 'hidden',
   },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: Colors.text, marginBottom: 2 },
-  rowLevel: { fontSize: 12, color: Colors.primary },
-  // Detail
-  detailContent: { padding: 20, gap: 16 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  backText: { color: Colors.primary, fontWeight: '600', fontSize: 15 },
-  detailTitle: { fontSize: 28, fontWeight: '800', color: Colors.text },
-  nivelBadge: { flexDirection: 'row', alignItems: 'center' },
-  nivelText: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
-  detailDesc: { fontSize: 16, color: Colors.textSecondary, lineHeight: 24 },
+  featuredCard: {
+    shadowColor: Colors.primary,
+    shadowRadius: 16,
+    shadowOpacity: 0.3,
+    elevation: 8,
+    borderColor: Colors.primary + '40',
+  },
+  featuredStrip: { height: 2, backgroundColor: Colors.primary, width: '100%' },
+  methodCardInner: { padding: 16, gap: 10 },
+
+  methodRow1: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  starBadge: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: Colors.primary + '25',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  methodTitle: { fontSize: 15, fontWeight: '700', color: Colors.text, flex: 1 },
+
+  levelBadge: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1,
+  },
+  levelBadgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+
+  methodDesc: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
+
+  expandRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  expandHint: { fontSize: 12, color: Colors.textTertiary, fontWeight: '600' },
 });

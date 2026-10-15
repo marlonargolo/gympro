@@ -1,4 +1,4 @@
-// ProfileView — faithful port of Views/ProfileView.swift
+// ProfileScreen — Premium dark UI rewrite
 import React from 'react';
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView,
@@ -12,7 +12,9 @@ import { nivelAtividadeLabel, modalidadeLabel } from '../../data/types';
 
 const sexos: Sexo[] = ['masculino', 'feminino'];
 const niveis: NivelAtividade[] = ['sedentario', 'leve', 'moderado', 'ativo', 'muitoAtivo'];
-const modalidades: ModalidadeAtleta[] = ['corredor', 'futebol', 'musculacao', 'ciclista', 'natacao', 'crossTraining'];
+const modalidades: ModalidadeAtleta[] = [
+  'corredor', 'futebol', 'musculacao', 'ciclista', 'natacao', 'crossTraining',
+];
 
 export default function ProfileScreen() {
   const { perfil, setPerfil } = useStore();
@@ -21,12 +23,41 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-        <Text style={s.title}>Perfil</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
+      >
+        {/* ── AVATAR HEADER ─────────────────────────────────── */}
+        <View style={s.avatarHeader}>
+          <View style={s.avatarCircle}>
+            {perfil.nome.trim().length > 0 ? (
+              <Text style={s.avatarLetter}>
+                {perfil.nome.trim()[0].toUpperCase()}
+              </Text>
+            ) : (
+              <Ionicons name="person" size={36} color={Colors.primary} />
+            )}
+          </View>
+          <Text style={s.avatarName}>
+            {perfil.nome.trim().length > 0 ? perfil.nome : 'Atleta'}
+          </Text>
+          <Text style={s.avatarSub}>
+            {modalidadeLabel[perfil.modalidadePrincipal]}
+          </Text>
+        </View>
 
-        {/* Dados pessoais */}
-        <Section title="Dados pessoais">
-          <FormField label="Nome">
+        {/* ── STATS ROW ─────────────────────────────────────── */}
+        <View style={s.statsRow}>
+          <StatCard value={perfil.pesoKg.toFixed(1)} label="KG" />
+          <StatCard value={String(perfil.alturaCm)} label="CM" />
+          <StatCard value={String(perfil.idade)} label="ANOS" />
+        </View>
+
+        {/* ── DADOS PESSOAIS ────────────────────────────────── */}
+        <SectionCard title="DADOS PESSOAIS">
+          {/* Nome */}
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldLabel}>Nome</Text>
             <TextInput
               style={s.input}
               value={perfil.nome}
@@ -34,46 +65,58 @@ export default function ProfileScreen() {
               placeholder="Seu nome"
               placeholderTextColor={Colors.textTertiary}
             />
-          </FormField>
+          </View>
 
-          <FormField label="Sexo">
+          <View style={s.divider} />
+
+          {/* Sexo segmented */}
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldLabel}>Sexo</Text>
             <View style={s.segmented}>
-              {sexos.map(s_ => (
+              {sexos.map(sx => (
                 <TouchableOpacity
-                  key={s_}
-                  style={[s.seg, perfil.sexo === s_ && s.segAtivo]}
-                  onPress={() => setPerfil({ ...perfil, sexo: s_ })}
+                  key={sx}
+                  style={[s.segPill, perfil.sexo === sx && s.segPillAtivo]}
+                  onPress={() => setPerfil({ ...perfil, sexo: sx })}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[s.segText, perfil.sexo === s_ && s.segTextAtivo]}>
-                    {s_ === 'masculino' ? 'Masculino' : 'Feminino'}
+                  <Text style={[s.segPillText, perfil.sexo === sx && s.segPillTextAtivo]}>
+                    {sx === 'masculino' ? 'Masculino' : 'Feminino'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-          </FormField>
+          </View>
 
-          <FormField label={`Idade: ${perfil.idade} anos`}>
-            <View style={s.stepper}>
+          <View style={s.divider} />
+
+          {/* Idade stepper */}
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldLabel}>Idade</Text>
+            <View style={s.stepperRow}>
               <TouchableOpacity
                 style={s.stepBtn}
                 onPress={() => setPerfil({ ...perfil, idade: Math.max(10, perfil.idade - 1) })}
+                activeOpacity={0.7}
               >
-                <Ionicons name="remove" size={18} color={Colors.primary} />
+                <Ionicons name="remove" size={20} color={Colors.primary} />
               </TouchableOpacity>
-              <Text style={s.stepVal}>{perfil.idade}</Text>
+              <Text style={s.stepValue}>{perfil.idade}</Text>
               <TouchableOpacity
                 style={s.stepBtn}
                 onPress={() => setPerfil({ ...perfil, idade: Math.min(90, perfil.idade + 1) })}
+                activeOpacity={0.7}
               >
-                <Ionicons name="add" size={18} color={Colors.primary} />
+                <Ionicons name="add" size={20} color={Colors.primary} />
               </TouchableOpacity>
             </View>
-          </FormField>
-        </Section>
+          </View>
+        </SectionCard>
 
-        {/* Medidas */}
-        <Section title="Medidas">
-          <FormField label="Peso (kg)">
+        {/* ── MEDIDAS ───────────────────────────────────────── */}
+        <SectionCard title="MEDIDAS">
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldLabel}>Peso (kg)</Text>
             <TextInput
               style={s.input}
               value={String(perfil.pesoKg)}
@@ -82,8 +125,10 @@ export default function ProfileScreen() {
               placeholder="kg"
               placeholderTextColor={Colors.textTertiary}
             />
-          </FormField>
-          <FormField label="Altura (cm)">
+          </View>
+          <View style={s.divider} />
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldLabel}>Altura (cm)</Text>
             <TextInput
               style={s.input}
               value={String(perfil.alturaCm)}
@@ -92,141 +137,378 @@ export default function ProfileScreen() {
               placeholder="cm"
               placeholderTextColor={Colors.textTertiary}
             />
-          </FormField>
-        </Section>
+          </View>
+        </SectionCard>
 
-        {/* Atividade e modalidade */}
-        <Section title="Atividade e modalidade">
-          <Text style={s.fieldLabel}>Nível de atividade</Text>
+        {/* ── ATIVIDADE ─────────────────────────────────────── */}
+        <SectionCard title="ATIVIDADE">
+          <Text style={s.subLabel}>Nível de atividade</Text>
           {niveis.map(n => (
             <TouchableOpacity
               key={n}
-              style={[s.listOption, perfil.nivelAtividade === n && s.listOptionAtivo]}
+              style={[s.radioRow, perfil.nivelAtividade === n && s.radioRowAtivo]}
               onPress={() => setPerfil({ ...perfil, nivelAtividade: n })}
+              activeOpacity={0.75}
             >
-              <Text style={[s.listOptionText, perfil.nivelAtividade === n && s.listOptionTextAtivo]}>
+              <Text
+                style={[
+                  s.radioText,
+                  perfil.nivelAtividade === n && s.radioTextAtivo,
+                ]}
+              >
                 {nivelAtividadeLabel[n]}
               </Text>
               {perfil.nivelAtividade === n && (
-                <Ionicons name="checkmark" size={16} color={Colors.primary} />
+                <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
               )}
             </TouchableOpacity>
           ))}
 
-          <Text style={[s.fieldLabel, { marginTop: 12 }]}>Modalidade principal</Text>
+          <View style={[s.divider, { marginTop: 4 }]} />
+
+          <Text style={[s.subLabel, { marginTop: 4 }]}>Modalidade principal</Text>
           {modalidades.map(m => (
             <TouchableOpacity
               key={m}
-              style={[s.listOption, perfil.modalidadePrincipal === m && s.listOptionAtivo]}
+              style={[s.radioRow, perfil.modalidadePrincipal === m && s.radioRowAtivo]}
               onPress={() => setPerfil({ ...perfil, modalidadePrincipal: m })}
+              activeOpacity={0.75}
             >
-              <Text style={[s.listOptionText, perfil.modalidadePrincipal === m && s.listOptionTextAtivo]}>
+              <Text
+                style={[
+                  s.radioText,
+                  perfil.modalidadePrincipal === m && s.radioTextAtivo,
+                ]}
+              >
                 {modalidadeLabel[m]}
               </Text>
               {perfil.modalidadePrincipal === m && (
-                <Ionicons name="checkmark" size={16} color={Colors.primary} />
+                <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
               )}
             </TouchableOpacity>
           ))}
-        </Section>
+        </SectionCard>
 
-        {/* Resultado */}
-        <Section title="Resultado">
-          <View style={s.resultRow}>
-            <Text style={s.resultLabel}>TMB</Text>
-            <Text style={s.resultValue}>{tmb} kcal/dia</Text>
+        {/* ── RESULTADO ─────────────────────────────────────── */}
+        <View style={s.resultCard}>
+          <View style={s.resultTopStrip} />
+          <View style={s.resultBody}>
+            <Text style={s.sectionTitle}>RESULTADO</Text>
+
+            <View style={s.resultRow}>
+              <Text style={s.resultLabel}>TMB (repouso)</Text>
+              <Text style={s.resultValueNormal}>{tmb} kcal/dia</Text>
+            </View>
+
+            <View style={[s.divider, { marginVertical: 10 }]} />
+
+            <View style={s.resultRow}>
+              <Text style={s.resultLabel}>Gasto total</Text>
+              <Text style={s.resultValuePrimary}>{get} kcal/dia</Text>
+            </View>
+
+            <Text style={s.resultNote}>
+              Calculado pela fórmula Mifflin-St Jeor
+            </Text>
           </View>
-          <View style={s.resultRow}>
-            <Text style={s.resultLabel}>Gasto total estimado</Text>
-            <Text style={[s.resultValue, { color: Colors.primary }]}>{get} kcal/dia</Text>
-          </View>
-        </Section>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StatCard({ value, label }: { value: string; label: string }) {
   return (
-    <View style={ss.section}>
-      <Text style={ss.sectionTitle}>{title}</Text>
-      <View style={ss.sectionBody}>{children}</View>
+    <View style={sc.card}>
+      <Text style={sc.value}>{value}</Text>
+      <Text style={sc.label}>{label}</Text>
     </View>
   );
 }
 
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={ss.field}>
-      <Text style={ss.fieldLabel}>{label}</Text>
-      {children}
+    <View>
+      <Text style={s.sectionTitle}>{title}</Text>
+      <View style={s.sectionCard}>
+        {children}
+      </View>
     </View>
   );
 }
 
-const ss = StyleSheet.create({
-  section: { gap: 8 },
-  sectionTitle: {
-    fontSize: 13, fontWeight: '700', color: Colors.textTertiary,
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4,
-  },
-  sectionBody: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const sc = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.glassBorder,
-    gap: 12,
   },
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 13, color: Colors.textSecondary },
+  value: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: Colors.text,
+    letterSpacing: -0.5,
+  },
+  label: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 3,
+  },
 });
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { padding: 18, gap: 20, paddingBottom: 40 },
-  title: { fontSize: 26, fontWeight: '700', color: Colors.text },
-  fieldLabel: { fontSize: 13, color: Colors.textSecondary, marginBottom: 4 },
+  scroll: { padding: 18, gap: 20, paddingBottom: 48 },
+
+  // Avatar header
+  avatarHeader: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 6,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary + '22',
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowRadius: 16,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  avatarLetter: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  avatarName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: 4,
+  },
+  avatarSub: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+
+  // Stats row
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  // Section title
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+
+  // Section card
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 4,
+  },
+
+  // Field group
+  fieldGroup: {
+    paddingVertical: 10,
+    gap: 8,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  // Input
   input: {
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     color: Colors.text,
     fontSize: 15,
+    fontWeight: '600',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.glassBorder,
   },
-  segmented: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', gap: 4 },
-  seg: {
-    flex: 1, padding: 10, alignItems: 'center',
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: Colors.glassBorder,
+  },
+
+  // Segmented control
+  segmented: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  segPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
   },
-  segAtivo: { backgroundColor: Colors.primary },
-  segText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
-  segTextAtivo: { color: '#FFF' },
-  stepper: {
-    flexDirection: 'row', alignItems: 'center', gap: 16,
-    backgroundColor: Colors.surfaceElevated, borderRadius: 10, padding: 8,
+  segPillAtivo: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowRadius: 10,
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
+  segPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  segPillTextAtivo: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
+  // Stepper
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
     alignSelf: 'flex-start',
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    overflow: 'hidden',
   },
-  stepBtn: { padding: 6 },
-  stepVal: { fontSize: 18, fontWeight: '700', color: Colors.text, minWidth: 36, textAlign: 'center' },
-  listOption: {
+  stepBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    minWidth: 48,
+    textAlign: 'center',
+    paddingVertical: 10,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: Colors.glassBorder,
+  },
+
+  // Radio list
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
+    marginVertical: 2,
+  },
+  radioRowAtivo: {
+    backgroundColor: Colors.primary + '14',
+    borderLeftColor: Colors.primary,
+  },
+  radioText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  radioTextAtivo: {
+    color: Colors.text,
+    fontWeight: '600',
+  },
+
+  // Resultado card
+  resultCard: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    backgroundColor: Colors.surface,
+    shadowColor: Colors.primary,
+    shadowRadius: 16,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  resultTopStrip: {
+    height: 2,
+    backgroundColor: Colors.primary,
+  },
+  resultBody: {
+    padding: 18,
+    gap: 4,
+  },
+  resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  listOptionAtivo: { borderColor: Colors.primary, backgroundColor: Colors.primary + '18' },
-  listOptionText: { fontSize: 14, color: Colors.textSecondary, flex: 1 },
-  listOptionTextAtivo: { color: Colors.text, fontWeight: '600' },
-  resultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  resultLabel: { fontSize: 14, color: Colors.textSecondary },
-  resultValue: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  resultLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  resultValueNormal: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  resultValuePrimary: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  resultNote: {
+    fontSize: 11,
+    color: Colors.textTertiary,
+    marginTop: 10,
+  },
 });

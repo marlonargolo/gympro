@@ -1,7 +1,8 @@
-// MarketplaceView — faithful port of Views/Marketplace/MarketplaceView.swift
+// MarketplaceView — premium dark UI rewrite
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Modal,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
+  Modal, FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -25,139 +26,303 @@ export default function MarketplaceScreen() {
 
   const total = carrinho.reduce((s, p) => s + p.preco, 0);
 
+  // Group cart items by id for display
+  const carrinhoAgrupado = carrinho.reduce<Record<string, { produto: ProdutoSuplemento; qty: number }>>((acc, item) => {
+    if (acc[item.id]) {
+      acc[item.id].qty += 1;
+    } else {
+      acc[item.id] = { produto: item, qty: 1 };
+    }
+    return acc;
+  }, {});
+
   return (
     <SafeAreaView style={s.safe}>
-      {/* Toolbar cart */}
-      <View style={s.toolbar}>
-        <Text style={s.toolbarTitle}>Parceiros</Text>
-        <TouchableOpacity onPress={() => setShowCarrinho(true)} style={s.cartBtn}>
-          <Ionicons name="cart" size={22} color={Colors.primary} />
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.headerTitle}>Marketplace</Text>
+          <Text style={s.headerSub}>Suplementos &amp; parceiros</Text>
+        </View>
+        <TouchableOpacity style={s.cartBtn} onPress={() => setShowCarrinho(true)}>
+          <Ionicons name="cart" size={22} color="#FFF" />
           {carrinho.length > 0 && (
-            <View style={s.badge}>
-              <Text style={s.badgeText}>{carrinho.length}</Text>
+            <View style={s.cartBadge}>
+              <Text style={s.cartBadgeText}>{carrinho.length}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
+      {/* ── Section label ── */}
+      <Text style={s.sectionLabel}>LOJAS PARCEIRAS</Text>
+
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {mockLojas.map(loja => (
-          <View key={loja.id} style={s.lojaSection}>
+          <View key={loja.id} style={s.lojaCard}>
+            {/* 3px top accent strip */}
+            <View style={s.lojaStrip} />
+
+            {/* Loja header */}
             <View style={s.lojaHeader}>
-              <Ionicons name={loja.logoIcon as any} size={20} color={Colors.primary2} />
-              <Text style={s.lojaNome}>{loja.nome}</Text>
-            </View>
-            {loja.produtos.map(produto => (
-              <View key={produto.id} style={s.produtoRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.produtoNome}>{produto.nome}</Text>
-                  <Text style={s.produtoCateg}>{produto.categoria}</Text>
-                </View>
-                <Text style={s.produtoPreco}>
-                  {produto.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => addToCart(produto)}
-                  style={s.addBtn}
-                >
-                  <Ionicons name="cart" size={16} color={Colors.primary} />
-                  <Ionicons name="add" size={12} color={Colors.primary} style={{ marginLeft: -4 }} />
-                </TouchableOpacity>
+              <View style={s.lojaIconCircle}>
+                <Ionicons name={loja.logoIcon as any} size={32} color={Colors.primary} />
               </View>
-            ))}
+              <View style={{ flex: 1 }}>
+                <Text style={s.lojaNome}>{loja.nome}</Text>
+                <Text style={s.lojaSub}>{loja.produtos.length} produtos</Text>
+              </View>
+              <View style={s.lojaRightChip}>
+                <Ionicons name="star" size={11} color={Colors.primary2} />
+                <Text style={s.lojaRatingText}> 4.8</Text>
+              </View>
+            </View>
+
+            {/* Product grid */}
+            <View style={s.productGrid}>
+              {loja.produtos.map(produto => (
+                <View key={produto.id} style={s.productCard}>
+                  <View style={s.productCardInner}>
+                    <Text style={s.productCateg} numberOfLines={1}>
+                      {produto.categoria.toUpperCase()}
+                    </Text>
+                    <Text style={s.productNome} numberOfLines={2}>
+                      {produto.nome}
+                    </Text>
+                    <Text style={s.productPreco}>
+                      {produto.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={s.addCircle}
+                    onPress={() => addToCart(produto)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={18} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
         ))}
+        {/* spacer for FAB */}
+        <View style={{ height: 80 }} />
       </ScrollView>
 
-      {/* Cart modal */}
-      <Modal visible={showCarrinho} animationType="slide">
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
-          <View style={s.toolbar}>
-            <Text style={s.toolbarTitle}>Carrinho</Text>
-            <TouchableOpacity onPress={() => setShowCarrinho(false)}>
-              <Ionicons name="close" size={24} color={Colors.textSecondary} />
-            </TouchableOpacity>
+      {/* ── Cart FAB ── */}
+      <TouchableOpacity
+        style={s.fab}
+        onPress={() => setShowCarrinho(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="cart" size={26} color="#FFF" />
+        {carrinho.length > 0 && (
+          <View style={s.fabBadge}>
+            <Text style={s.fabBadgeText}>{carrinho.length}</Text>
           </View>
-          <ScrollView contentContainerStyle={s.scroll}>
+        )}
+      </TouchableOpacity>
+
+      {/* ── Cart Modal ── */}
+      <Modal visible={showCarrinho} animationType="slide" transparent>
+        <View style={cm.overlay}>
+          <View style={cm.sheet}>
+            <View style={cm.handle} />
+            <View style={cm.sheetHeader}>
+              <Text style={cm.sheetTitle}>Carrinho</Text>
+              <TouchableOpacity onPress={() => setShowCarrinho(false)}>
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
             {carrinho.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="cart-outline" size={48} color={Colors.textTertiary} />
-                <Text style={s.emptyText}>Carrinho vazio</Text>
+              <View style={cm.empty}>
+                <Ionicons name="cart-outline" size={56} color={Colors.textTertiary} />
+                <Text style={cm.emptyTitle}>Carrinho vazio</Text>
+                <Text style={cm.emptySub}>Adicione produtos às lojas parceiras</Text>
               </View>
             ) : (
               <>
-                {carrinho.map((item, idx) => (
-                  <View key={`${item.id}-${idx}`} style={s.cartRow}>
-                    <Text style={{ flex: 1, color: Colors.text, fontSize: 14 }}>{item.nome}</Text>
-                    <Text style={s.produtoPreco}>
-                      {item.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </Text>
-                    <TouchableOpacity onPress={() => removeFromCart(item.id)}>
-                      <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <View style={[s.cartRow, { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 14 }]}>
-                  <Text style={{ flex: 1, fontWeight: '700', color: Colors.text, fontSize: 16 }}>Total</Text>
-                  <Text style={[s.produtoPreco, { fontSize: 18 }]}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={cm.list}>
+                  {Object.values(carrinhoAgrupado).map(({ produto, qty }) => (
+                    <View key={produto.id} style={cm.cartRow}>
+                      <View style={cm.cartDot} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={cm.cartItemName} numberOfLines={1}>
+                          {produto.nome}
+                        </Text>
+                        <Text style={cm.cartItemCateg}>{produto.categoria}</Text>
+                      </View>
+                      <Text style={cm.cartQty}>x{qty}</Text>
+                      <Text style={cm.cartPrice}>
+                        {(produto.preco * qty).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </Text>
+                      <TouchableOpacity onPress={() => removeFromCart(produto.id)} style={cm.trashBtn}>
+                        <Ionicons name="trash-outline" size={16} color={Colors.textTertiary} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                <View style={cm.totalRow}>
+                  <Text style={cm.totalLabel}>TOTAL</Text>
+                  <Text style={cm.totalValue}>
                     {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </Text>
                 </View>
-                <TouchableOpacity style={s.checkoutBtn}>
-                  <Text style={s.checkoutText}>Finalizar pedido (mock)</Text>
+
+                <TouchableOpacity style={cm.checkoutBtn} activeOpacity={0.85}>
+                  <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+                  <Text style={cm.checkoutText}>Finalizar pedido</Text>
                 </TouchableOpacity>
               </>
             )}
-          </ScrollView>
-        </SafeAreaView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  toolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 8,
+
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
   },
-  toolbarTitle: { fontSize: 22, fontWeight: '700', color: Colors.text },
-  cartBtn: { position: 'relative', padding: 4 },
-  badge: {
-    position: 'absolute', top: 0, right: 0,
-    backgroundColor: Colors.primary, borderRadius: 8,
-    width: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+  headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.text, letterSpacing: -0.4 },
+  headerSub: { fontSize: 13, color: Colors.textSecondary, marginTop: 1 },
+
+  cartBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: Colors.primary, shadowRadius: 14, shadowOpacity: 0.4, elevation: 6,
   },
-  badgeText: { fontSize: 10, color: '#FFF', fontWeight: '700' },
-  scroll: { padding: 16, gap: 16, paddingBottom: 32 },
-  lojaSection: {
-    backgroundColor: Colors.surface, borderRadius: 16,
-    borderWidth: 1, borderColor: Colors.glassBorder, overflow: 'hidden',
+  cartBadge: {
+    position: 'absolute', top: -2, right: -2,
+    backgroundColor: '#FFF', borderRadius: 9,
+    width: 18, height: 18, alignItems: 'center', justifyContent: 'center',
   },
+  cartBadgeText: { fontSize: 10, fontWeight: '800', color: Colors.primary },
+
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', color: Colors.textTertiary,
+    letterSpacing: 1.2, paddingHorizontal: 20, paddingBottom: 10,
+  },
+
+  scroll: { paddingHorizontal: 16, gap: 16 },
+
+  lojaCard: {
+    backgroundColor: Colors.surface, borderRadius: 20,
+    borderWidth: 1, borderColor: Colors.glassBorder,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowRadius: 10, shadowOpacity: 0.25, elevation: 5,
+  },
+  lojaStrip: { height: 3, backgroundColor: Colors.primary },
   lojaHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 14, backgroundColor: Colors.surfaceElevated,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 16, paddingBottom: 12,
   },
-  lojaNome: { fontSize: 15, fontWeight: '700', color: Colors.text },
-  produtoRow: {
+  lojaIconCircle: {
+    width: 54, height: 54, borderRadius: 27,
+    backgroundColor: Colors.primary + '18',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  lojaNome: { fontSize: 17, fontWeight: '700', color: Colors.text },
+  lojaSub: { fontSize: 12, color: Colors.textTertiary, marginTop: 1 },
+  lojaRightChip: { flexDirection: 'row', alignItems: 'center' },
+  lojaRatingText: { fontSize: 12, fontWeight: '700', color: Colors.primary2 },
+
+  productGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: 12, paddingBottom: 14,
+  },
+  productCard: {
+    width: '48%', backgroundColor: Colors.surfaceElevated, borderRadius: 12,
+    padding: 12, gap: 8,
+    borderWidth: 1, borderColor: Colors.glassBorder,
+  },
+  productCardInner: { flex: 1, gap: 4 },
+  productCateg: {
+    fontSize: 10, fontWeight: '700', color: Colors.textTertiary, letterSpacing: 0.8,
+  },
+  productNome: { fontSize: 13, fontWeight: '700', color: Colors.text, lineHeight: 17 },
+  productPreco: { fontSize: 16, fontWeight: '800', color: Colors.primary, marginTop: 4 },
+  addCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    alignSelf: 'flex-end',
+  },
+
+  fab: {
+    position: 'absolute', bottom: 28, right: 20,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: Colors.primary, shadowRadius: 16, shadowOpacity: 0.45, elevation: 10,
+  },
+  fabBadge: {
+    position: 'absolute', top: -2, right: -2,
+    backgroundColor: '#FFF', borderRadius: 10,
+    width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
+  },
+  fabBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.primary },
+});
+
+const cm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: Colors.surfaceElevated,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 16, paddingBottom: 40,
+    maxHeight: '85%',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.glassBorder, alignSelf: 'center', marginBottom: 12,
+  },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingBottom: 16,
+  },
+  sheetTitle: { fontSize: 22, fontWeight: '800', color: Colors.text },
+
+  empty: { alignItems: 'center', paddingVertical: 48, gap: 10 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textSecondary },
+  emptySub: { fontSize: 13, color: Colors.textTertiary, textAlign: 'center' },
+
+  list: { paddingHorizontal: 24, gap: 4, paddingBottom: 16 },
+  cartRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 14, borderTopWidth: 1, borderTopColor: Colors.border,
+    paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: Colors.glassBorder,
   },
-  produtoNome: { fontSize: 14, color: Colors.text, marginBottom: 2 },
-  produtoCateg: { fontSize: 12, color: Colors.textTertiary },
-  produtoPreco: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  addBtn: {
-    backgroundColor: Colors.primary + '22', borderRadius: 8,
-    padding: 8, flexDirection: 'row', alignItems: 'center',
+  cartDot: {
+    width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary,
   },
-  cartRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { color: Colors.textTertiary, fontSize: 16 },
+  cartItemName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  cartItemCateg: { fontSize: 11, color: Colors.textTertiary, marginTop: 1 },
+  cartQty: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
+  cartPrice: { fontSize: 14, fontWeight: '700', color: Colors.primary2 },
+  trashBtn: { padding: 4 },
+
+  totalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 14,
+    borderTopWidth: 1, borderTopColor: Colors.glassBorder,
+  },
+  totalLabel: { fontSize: 12, fontWeight: '700', color: Colors.textTertiary, letterSpacing: 1 },
+  totalValue: { fontSize: 24, fontWeight: '800', color: Colors.text },
+
   checkoutBtn: {
-    backgroundColor: Colors.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 8,
+    marginHorizontal: 24, backgroundColor: Colors.primary, borderRadius: 16,
+    padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: Colors.primary, shadowRadius: 14, shadowOpacity: 0.35, elevation: 6,
   },
   checkoutText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });
