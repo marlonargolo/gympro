@@ -1,8 +1,9 @@
-// HealthCalculatorsView — premium dark UI rewrite
+// HealthCalculatorsView — premium dark UI
 import React, { useState } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useStore } from '../context/StoreContext';

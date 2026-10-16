@@ -1,15 +1,14 @@
-// HomeScreen — premium dark UI rewrite
+// HomeScreen — Premium redesign with LinearGradient + authentic feel
 import React from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
 import { useStore } from '../../context/StoreContext';
 import { calcularTMB, calcularGET } from '../../data/calculators';
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function todayLabel(): string {
   return new Date().toLocaleDateString('pt-BR', {
@@ -17,101 +16,69 @@ function todayLabel(): string {
   });
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function MetricBlock({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <View style={hero.block}>
-      <View style={[hero.dot, { backgroundColor: color }]} />
       <Text style={hero.metaLabel}>{label}</Text>
       <Text style={[hero.metaValue, { color }]}>{value}</Text>
-      <Text style={hero.metaUnit}>kcal</Text>
+      <Text style={hero.metaUnit}>kcal/dia</Text>
     </View>
   );
 }
 
-function WideShortcutCard() {
-  return (
-    <TouchableOpacity
-      style={[s.shortcutCard, s.wideCard]}
-      onPress={() => router.navigate('/music' as any)}
-      activeOpacity={0.75}
-    >
-      <View style={s.wideInner}>
-        {/* Música */}
-        <View style={s.wideItem}>
-          <View style={s.iconWrap}>
-            <Ionicons name="musical-notes" size={28} color={Colors.primary} />
-          </View>
-          <Text style={s.shortcutTitle}>Música</Text>
-          <Text style={s.shortcutSub}>Spotify / YouTube</Text>
-        </View>
-        <View style={s.wideDivider} />
-        {/* Sono */}
-        <TouchableOpacity
-          style={s.wideItem}
-          onPress={() => router.navigate('/sleep' as any)}
-          activeOpacity={0.75}
-        >
-          <View style={s.iconWrap}>
-            <Ionicons name="moon" size={28} color={Colors.accent} />
-          </View>
-          <Text style={s.shortcutTitle}>Sono</Text>
-          <Text style={s.shortcutSub}>Análise e dicas</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function ShortcutCard({
-  title, subtitle, icon, route, iconColor,
+function QuickCard({
+  title, subtitle, icon, route, iconColor, accentColor,
 }: {
   title: string;
   subtitle: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   route: string;
-  iconColor?: string;
+  iconColor: string;
+  accentColor?: string;
 }) {
-  const color = iconColor ?? Colors.primary;
+  const accent = accentColor ?? iconColor;
   return (
     <TouchableOpacity
-      style={[s.shortcutCard, s.halfCard]}
+      style={q.wrap}
       onPress={() => router.navigate(route as any)}
-      activeOpacity={0.75}
+      activeOpacity={0.8}
     >
-      {/* orange top border strip */}
-      <View style={[s.accentStrip, { backgroundColor: color }]} />
-      <View style={s.halfBody}>
-        <View style={[s.iconWrap, { shadowColor: color, shadowRadius: 10, shadowOpacity: 0.4, shadowOffset: { width: 0, height: 0 } }]}>
-          <Ionicons name={icon} size={28} color={color} />
+      <View style={[q.topLine, { backgroundColor: accent }]} />
+      <View style={q.body}>
+        <View style={[q.iconBox, { backgroundColor: iconColor + '18' }]}>
+          <Ionicons name={icon} size={22} color={iconColor} />
         </View>
-        <Text style={s.shortcutTitle}>{title}</Text>
-        <Text style={s.shortcutSub}>{subtitle}</Text>
+        <Text style={q.title}>{title}</Text>
+        <Text style={q.sub}>{subtitle}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-function WatchCard() {
+function WideCard({
+  left, right,
+}: {
+  left: { title: string; sub: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; route: string };
+  right: { title: string; sub: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; route: string };
+}) {
   return (
-    <TouchableOpacity
-      style={[s.shortcutCard, s.wideCard, s.watchCard]}
-      onPress={() => router.navigate('/sleep' as any)}
-      activeOpacity={0.75}
-    >
-      <View style={[s.accentStrip, { backgroundColor: Colors.success }]} />
-      <View style={s.watchBody}>
-        <View style={[s.iconWrap, { shadowColor: Colors.success, shadowRadius: 10, shadowOpacity: 0.4, shadowOffset: { width: 0, height: 0 } }]}>
-          <Ionicons name="watch" size={28} color={Colors.success} />
+    <View style={w.wrap}>
+      <TouchableOpacity style={w.half} onPress={() => router.navigate(left.route as any)} activeOpacity={0.8}>
+        <View style={[w.iconBox, { backgroundColor: left.color + '18' }]}>
+          <Ionicons name={left.icon} size={22} color={left.color} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={s.shortcutTitle}>Watch</Text>
-          <Text style={s.shortcutSub}>Notificações Apple Watch (mock)</Text>
+        <Text style={w.title}>{left.title}</Text>
+        <Text style={w.sub}>{left.sub}</Text>
+      </TouchableOpacity>
+      <View style={w.divider} />
+      <TouchableOpacity style={w.half} onPress={() => router.navigate(right.route as any)} activeOpacity={0.8}>
+        <View style={[w.iconBox, { backgroundColor: right.color + '18' }]}>
+          <Ionicons name={right.icon} size={22} color={right.color} />
         </View>
-        <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
+        <Text style={w.title}>{right.title}</Text>
+        <Text style={w.sub}>{right.sub}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -126,23 +93,21 @@ function PillCTA({
 }) {
   return (
     <TouchableOpacity
-      style={s.pillCta}
+      style={s.pill}
       onPress={() => router.navigate(route as any)}
       activeOpacity={0.8}
     >
-      <View style={[s.pillIcon, { shadowColor: iconColor, shadowRadius: 8, shadowOpacity: 0.3, shadowOffset: { width: 0, height: 0 } }]}>
-        <Ionicons name={icon} size={22} color={iconColor} />
+      <View style={[s.pillIcon, { backgroundColor: iconColor + '18' }]}>
+        <Ionicons name={icon} size={20} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.pillTitle}>{title}</Text>
         <Text style={s.pillSub}>{subtitle}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+      <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
     </TouchableOpacity>
   );
 }
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { perfil } = useStore();
@@ -152,53 +117,69 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView
-        contentContainerStyle={s.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Header ── */}
         <View style={s.headerRow}>
-          <Text style={s.greeting}>Olá, {nomeDisplay}</Text>
-          <Text style={s.dateLabel}>{todayLabel()}</Text>
+          <View>
+            <Text style={s.greeting}>Olá, {nomeDisplay}</Text>
+            <Text style={s.dateLabel}>{todayLabel()}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.navigate('/(tabs)/profile' as any)}
+            style={s.avatarBtn}
+            activeOpacity={0.8}
+          >
+            <Text style={s.avatarInitial}>
+              {nomeDisplay[0].toUpperCase()}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* ── Hero card (3D tilt + glow) ── */}
-        <View style={[s.heroCard, { transform: [{ perspective: 800 }, { rotateX: '1.5deg' }] }]}>
-          {/* orange top border */}
-          <View style={s.heroTopBorder} />
+        {/* ── Hero card ── */}
+        <LinearGradient
+          colors={['#1E1A2E', Colors.surface]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.heroCard}
+        >
+          <View style={s.heroAccentLine} />
           <View style={s.heroBody}>
+            <Text style={s.heroEyebrow}>CONSUMO CALÓRICO</Text>
             <View style={s.heroMetrics}>
-              <MetricBlock label="TMB · repouso" value={tmb.toLocaleString('pt-BR')} color={Colors.primary2} />
-              <View style={s.heroSeparator} />
-              <MetricBlock label="GET · total/dia" value={get.toLocaleString('pt-BR')} color={Colors.primary} />
+              <MetricBlock label="Repouso (TMB)" value={tmb.toLocaleString('pt-BR')} color={Colors.primary2} />
+              <View style={s.heroSep} />
+              <MetricBlock label="Total diário (GET)" value={get.toLocaleString('pt-BR')} color={Colors.primary} />
             </View>
             <TouchableOpacity
               onPress={() => router.navigate('/(tabs)/profile' as any)}
               style={s.editRow}
+              activeOpacity={0.7}
             >
-              <Ionicons name="create-outline" size={14} color={Colors.primary} />
-              <Text style={s.editLink}> Editar perfil →</Text>
+              <Ionicons name="create-outline" size={13} color={Colors.primary} />
+              <Text style={s.editLink}> Editar perfil</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </LinearGradient>
 
-        {/* ── Section label ── */}
+        {/* ── Acesso Rápido ── */}
         <Text style={s.sectionLabel}>ACESSO RÁPIDO</Text>
 
-        {/* ── Bento grid ── */}
-        {/* Row 0: wide card (Música + Sono) */}
-        <WideShortcutCard />
+        {/* Música + Sono */}
+        <WideCard
+          left={{ title: 'Música', sub: 'Spotify · YouTube', icon: 'musical-notes', color: Colors.primary, route: '/music' }}
+          right={{ title: 'Sono', sub: 'Análise e dicas', icon: 'moon', color: Colors.accent, route: '/sleep' }}
+        />
 
-        {/* Row 1: Profissionais | Nutricionistas */}
-        <View style={s.bentoRow}>
-          <ShortcutCard
+        {/* Profissionais + Nutricionistas */}
+        <View style={s.row}>
+          <QuickCard
             title="Profissionais"
             subtitle="Perto de você"
             icon="people"
             route="/maps"
             iconColor={Colors.primary}
           />
-          <ShortcutCard
+          <QuickCard
             title="Nutricionistas"
             subtitle="Especialistas"
             icon="medkit"
@@ -207,15 +188,30 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Row 2: Watch (full width) */}
-        <WatchCard />
+        {/* Watch */}
+        <TouchableOpacity
+          style={s.watchCard}
+          onPress={() => router.navigate('/sleep' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={[s.watchIcon, { backgroundColor: Colors.success + '18' }]}>
+            <Ionicons name="watch" size={20} color={Colors.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.watchTitle}>Apple Watch</Text>
+            <Text style={s.watchSub}>Notificações de treino</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+        </TouchableOpacity>
 
-        {/* ── CTA pills ── */}
+        {/* ── Ferramentas ── */}
+        <Text style={s.sectionLabel}>FERRAMENTAS</Text>
+
         <PillCTA
           icon="calculator"
           iconColor={Colors.accent}
           title="Calculadoras de Saúde"
-          subtitle="IMC · água · FC · macros"
+          subtitle="IMC · hidratação · FC · macros"
           route="/health-calculators"
         />
         <PillCTA
@@ -230,77 +226,173 @@ export default function HomeScreen() {
   );
 }
 
-// ─── Hero chart styles ─────────────────────────────────────────────────────────
+// ─── Hero styles ──────────────────────────────────────────────────────────────
 const hero = StyleSheet.create({
-  block: { flex: 1, alignItems: 'center', gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
+  block: { flex: 1, alignItems: 'center', gap: 3 },
   metaLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: Colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     textAlign: 'center',
   },
   metaValue: {
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '800',
-    lineHeight: 46,
+    lineHeight: 42,
     textAlign: 'center',
+    letterSpacing: -1,
   },
   metaUnit: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
     color: Colors.textTertiary,
+    fontWeight: '500',
+  },
+});
+
+// ─── Quick card styles ────────────────────────────────────────────────────────
+const q = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    overflow: 'hidden',
+  },
+  topLine: {
+    height: 2,
+    width: '100%',
+  },
+  body: {
+    padding: 14,
+    gap: 7,
+    minHeight: 100,
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  sub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    lineHeight: 15,
+  },
+});
+
+// ─── Wide card styles ─────────────────────────────────────────────────────────
+const w = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    overflow: 'hidden',
+  },
+  half: {
+    flex: 1,
+    padding: 16,
+    gap: 7,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: Colors.glassBorder,
+    marginVertical: 16,
+  },
+  iconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  sub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
 });
 
 // ─── Main styles ───────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 36, gap: 14 },
+  scroll: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 40, gap: 12 },
 
   // Header
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingBottom: 4,
   },
-  greeting: { fontSize: 26, fontWeight: '800', color: Colors.text },
-  dateLabel: { fontSize: 12, color: Colors.textTertiary, fontWeight: '500' },
+  greeting: { fontSize: 22, fontWeight: '800', color: Colors.text },
+  dateLabel: { fontSize: 11, color: Colors.textTertiary, marginTop: 2 },
+  avatarBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.primary + '22',
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
 
   // Hero card
   heroCard: {
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     overflow: 'hidden',
-    // glow shadow
-    shadowColor: '#FF6B35',
-    shadowRadius: 20,
-    shadowOpacity: 0.3,
+    shadowColor: Colors.primary,
+    shadowRadius: 16,
+    shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    elevation: 6,
   },
-  heroTopBorder: {
+  heroAccentLine: {
     height: 2,
     backgroundColor: Colors.primary,
   },
   heroBody: {
     padding: 20,
-    gap: 16,
+    gap: 12,
+  },
+  heroEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textTertiary,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   heroMetrics: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 0,
   },
-  heroSeparator: {
+  heroSep: {
     width: 1,
-    height: 60,
+    height: 50,
     backgroundColor: Colors.glassBorder,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
   },
   editRow: {
     flexDirection: 'row',
@@ -308,122 +400,82 @@ const s = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   editLink: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.primary,
     fontWeight: '600',
   },
 
   // Section label
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: Colors.textTertiary,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    paddingHorizontal: 2,
+    marginTop: 4,
   },
 
-  // Shortcut cards
-  shortcutCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowRadius: 8,
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-
-  wideCard: { width: '100%' },
-
-  wideInner: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 0,
-  },
-  wideItem: {
-    flex: 1,
-    alignItems: 'flex-start',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  wideDivider: {
-    width: 1,
-    backgroundColor: Colors.glassBorder,
-    marginHorizontal: 14,
-    alignSelf: 'stretch',
-  },
-
-  halfCard: { flex: 1 },
-
-  halfBody: {
-    padding: 16,
-    gap: 8,
-    minHeight: 110,
-  },
-
-  accentStrip: {
-    height: 3,
-    width: '100%',
-  },
-
-  watchCard: {},
-  watchBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 14,
-  },
-
-  bentoRow: {
+  // Row
+  row: {
     flexDirection: 'row',
     gap: 12,
   },
 
-  iconWrap: {
+  // Watch card
+  watchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    padding: 14,
+    gap: 12,
+  },
+  watchIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shortcutTitle: {
+  watchTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
   },
-  shortcutSub: {
-    fontSize: 12,
+  watchSub: {
+    fontSize: 11,
     color: Colors.textSecondary,
+    marginTop: 2,
   },
 
   // Pill CTAs
-  pillCta: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
-    gap: 14,
+    gap: 12,
   },
   pillIcon: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 10,
-    backgroundColor: Colors.glassBackground,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pillTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.text,
     marginBottom: 2,
   },
   pillSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
   },
 });

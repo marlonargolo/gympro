@@ -181,10 +181,13 @@ const chip = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 100,
     borderWidth: 1,
+    height: 36,
+    alignSelf: 'center',
   },
   text: {
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 18,
   },
 });
 
@@ -196,6 +199,7 @@ const card = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     overflow: 'hidden',
+    flexDirection: 'row',
     shadowColor: '#000',
     shadowRadius: 8,
     shadowOpacity: 0.3,
@@ -203,13 +207,15 @@ const card = StyleSheet.create({
     elevation: 4,
   },
   strip: {
-    height: 3,
-    width: '100%',
+    width: 4,
+    alignSelf: 'stretch',
   },
   body: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    paddingLeft: 14,
     gap: 12,
   },
   left: {

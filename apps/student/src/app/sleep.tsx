@@ -1,8 +1,9 @@
-// SleepScreen — premium dark UI rewrite
+// SleepScreen — premium dark UI
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useStore } from '../context/StoreContext';
@@ -114,7 +115,7 @@ function SleepQuality() {
           ))}
         </View>
         <Text style={s.qualidadeLabel}>
-          {qualidade >= 4 ? 'Excelente 🌟' : qualidade >= 3 ? 'Boa 👍' : qualidade >= 2 ? 'Regular 😐' : 'Ruim 😴'}
+          {qualidade >= 4 ? 'Excelente' : qualidade >= 3 ? 'Boa' : qualidade >= 2 ? 'Regular' : 'Ruim'}
         </Text>
       </View>
 
@@ -136,9 +137,16 @@ function SleepQuality() {
       </View>
 
       {/* Save button */}
-      <TouchableOpacity style={s.saveBtn} activeOpacity={0.85}>
-        <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-        <Text style={s.saveBtnText}>Salvar registro</Text>
+      <TouchableOpacity activeOpacity={0.85} style={{ borderRadius: 16, overflow: 'hidden' }}>
+        <LinearGradient
+          colors={[Colors.primary, Colors.primary2]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={s.saveBtn}
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+          <Text style={s.saveBtnText}>Salvar registro</Text>
+        </LinearGradient>
       </TouchableOpacity>
 
     </ScrollView>

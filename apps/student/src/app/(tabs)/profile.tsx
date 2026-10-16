@@ -1,8 +1,9 @@
-// ProfileScreen — Premium dark UI rewrite
+// ProfileScreen — Premium dark UI
 import React from 'react';
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { useStore } from '../../context/StoreContext';
@@ -190,7 +191,12 @@ export default function ProfileScreen() {
         </SectionCard>
 
         {/* ── RESULTADO ─────────────────────────────────────── */}
-        <View style={s.resultCard}>
+        <LinearGradient
+          colors={['#1E1620', Colors.surface]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.resultCard}
+        >
           <View style={s.resultTopStrip} />
           <View style={s.resultBody}>
             <Text style={s.sectionTitle}>RESULTADO</Text>
@@ -211,7 +217,7 @@ export default function ProfileScreen() {
               Calculado pela fórmula Mifflin-St Jeor
             </Text>
           </View>
-        </View>
+        </LinearGradient>
       </ScrollView>
     </SafeAreaView>
   );
@@ -221,10 +227,15 @@ export default function ProfileScreen() {
 
 function StatCard({ value, label }: { value: string; label: string }) {
   return (
-    <View style={sc.card}>
+    <LinearGradient
+      colors={['#1E1C2E', Colors.surfaceElevated]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={sc.card}
+    >
       <Text style={sc.value}>{value}</Text>
       <Text style={sc.label}>{label}</Text>
-    </View>
+    </LinearGradient>
   );
 }
 
