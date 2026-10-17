@@ -140,6 +140,7 @@ export default function WorkoutsScreen() {
       </View>
 
       {/* ── Filter chips ── */}
+      <View style={s.chipsWrap}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -155,6 +156,7 @@ export default function WorkoutsScreen() {
           />
         ))}
       </ScrollView>
+      </View>
 
       {/* ── Workout list ── */}
       <FlatList<Treino>
@@ -283,11 +285,15 @@ const s = StyleSheet.create({
     color: Colors.accent,
   },
 
+  chipsWrap: {
+    height: 56,
+  },
   chipsRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
     flexDirection: 'row',
+    alignItems: 'center',
   },
 
   list: {
