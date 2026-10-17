@@ -54,7 +54,10 @@ function FilterChip({
             },
       ]}
     >
-      <Text style={[chip.text, { color: ativo ? '#FFF' : Colors.textSecondary }]}>
+      <Text
+        style={[chip.text, { color: ativo ? '#FFF' : Colors.textSecondary }]}
+        numberOfLines={1}
+      >
         {titulo}
       </Text>
     </TouchableOpacity>
@@ -179,17 +182,19 @@ export default function WorkoutsScreen() {
 // ─── Chip styles ──────────────────────────────────────────────────────────────
 const chip = StyleSheet.create({
   base: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 100,
     borderWidth: 1,
-    height: 36,
+    height: 34,
+    justifyContent: 'center',
     alignSelf: 'center',
+    overflow: 'hidden',
   },
   text: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
 });
 
@@ -286,14 +291,15 @@ const s = StyleSheet.create({
   },
 
   chipsWrap: {
-    height: 56,
+    height: 54,
+    justifyContent: 'center',
   },
   chipsRow: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    height: 54,
   },
 
   list: {
