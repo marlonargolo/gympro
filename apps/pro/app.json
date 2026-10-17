@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "GymPro — Professional",
+    "name": "GymPro \u2014 Professional",
     "slug": "gympro-pro",
     "version": "1.0.0",
     "scheme": "gympro-pro",
@@ -22,11 +22,12 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/favicon.png"
+      "output": "single",
+      "bundler": "metro"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true
     }
