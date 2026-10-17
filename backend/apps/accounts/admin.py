@@ -45,7 +45,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'modalidade', 'fitness_goal', 'professional']
+    list_display = ['user', 'modalidade', 'fitness_goal', 'personal_trainer', 'nutritionist']
     list_filter = ['modalidade', 'fitness_goal']
     search_fields = ['user__full_name', 'user__email']
 
