@@ -16,6 +16,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="workout/[id]" options={{ title: 'Treino', headerBackTitle: 'Voltar' }} />
         <Stack.Screen name="training-methods" options={{ title: 'Métodos de treino' }} />
         <Stack.Screen name="health-calculators" options={{ title: 'Calculadoras de Saúde' }} />
