@@ -16,7 +16,7 @@ class Plan(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
     description = models.TextField()
-    plan_type = models.CharField(choices=PLAN_TYPE_CHOICES, max_length=20)
+    plan_type = models.CharField(choices=PLAN_TYPE_CHOICES, max_length=25)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     duration_days = models.IntegerField(default=30)
     features = models.JSONField(default=list, help_text='Lista de recursos do plano')
