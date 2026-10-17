@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
-import { getNearbyGyms } from '@gympro/api';
+import { getNearbyGyms, getConnections } from '@gympro/api';
 
 // SP fallback coords (expo-location not installed)
 const SP_LAT = -23.55;
@@ -22,11 +22,13 @@ interface Academia {
   is_open?: boolean;
 }
 
-const mockProfissionaisMapa = [
-  { id: '1', nome: 'Carlos Oliveira', especialidade: 'Personal Trainer', avaliacao: 4.8, precoConsultaAprox: 'R$ 80/h' },
-  { id: '2', nome: 'Ana Paula Silva', especialidade: 'Nutricionista Esportiva', avaliacao: 4.9, precoConsultaAprox: 'R$ 150/h' },
-  { id: '3', nome: 'Ricardo Santos', especialidade: 'Preparador Físico', avaliacao: 4.7, precoConsultaAprox: 'R$ 100/h' },
-];
+interface Connection {
+  id: number;
+  connection_type: string;
+  status: string;
+  requester_name: string | null;
+  target_name: string | null;
+}
 
 const MODALIDADES_OPCOES = [
   'Musculação', 'Crossfit', 'Yoga', 'Pilates', 'Natação',
@@ -38,23 +40,26 @@ type Tab = 'academias' | 'profissionais';
 export default function MapsScreen() {
   const [tab, setTab] = useState<Tab>('academias');
   const [academias, setAcademias] = useState<Academia[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    getNearbyGyms(SP_LAT, SP_LNG, 20)
-      .then((data: any[]) => {
-        const mapped: Academia[] = data.map(g => ({
-          id: String(g.id),
-          nome: g.name,
-          endereco: g.address,
-          avaliacao: g.avaliacao ?? 4.5,
-          modalidades: Array.isArray(g.modalidades) ? g.modalidades : [],
-          distance_km: g.distance_km,
-          is_open: g.is_open,
-        }));
-        setAcademias(mapped);
-      })
+    Promise.all([
+      getNearbyGyms(SP_LAT, SP_LNG, 20),
+      getConnections('accepted'),
+    ]).then(([gymsData, connsData]: [any[], any[]]) => {
+      const mapped: Academia[] = (Array.isArray(gymsData) ? gymsData : []).map(g => ({
+        id: String(g.id),
+        nome: g.gym_name ?? g.name ?? '—',
+        endereco: g.gym_address ?? g.address ?? '—',
+        avaliacao: 0,
+        modalidades: g.specialty ? [g.specialty] : [],
+        distance_km: g.distance_km,
+      }));
+      setAcademias(mapped);
+      setConnections(Array.isArray(connsData) ? connsData : []);
+    })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -125,12 +130,14 @@ export default function MapsScreen() {
         ) : (
           <>
             <Text style={s.sectionLabel}>
-              {mockProfissionaisMapa.length} PROFISSIONAIS ENCONTRADOS
+              {loading ? 'BUSCANDO...' : `${connections.length} PROFISSIONAIS VINCULADOS`}
             </Text>
-            {mockProfissionaisMapa.length === 0 ? (
-              <EmptyState icon="person-outline" text="Nenhum profissional encontrado" />
+            {loading ? (
+              <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : connections.length === 0 ? (
+              <EmptyState icon="person-outline" text="Nenhum profissional vinculado" />
             ) : (
-              mockProfissionaisMapa.map(pro => (
+              connections.map(pro => (
                 <ProfissionalCard key={pro.id} profissional={pro} />
               ))
             )}
@@ -196,7 +203,9 @@ function AcademiaCard({ academia }: { academia: Academia }) {
   );
 }
 
-function ProfissionalCard({ profissional }: { profissional: { id: string; nome: string; especialidade: string; avaliacao: number; precoConsultaAprox: string } }) {
+function ProfissionalCard({ profissional }: { profissional: Connection }) {
+  const nome = profissional.target_name ?? profissional.requester_name ?? 'Profissional';
+  const tipo = profissional.connection_type === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
   return (
     <View style={c.card}>
       <View style={[c.topStrip, { backgroundColor: Colors.accent }]} />
@@ -206,26 +215,12 @@ function ProfissionalCard({ profissional }: { profissional: { id: string; nome: 
             <Ionicons name="person" size={22} color={Colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={c.name}>{profissional.nome}</Text>
-            <Text style={c.address}>{profissional.especialidade}</Text>
-            <View style={c.ratingRow}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Ionicons
-                  key={i}
-                  name={i < Math.floor(profissional.avaliacao) ? 'star' : 'star-outline'}
-                  size={11}
-                  color={Colors.primary2}
-                />
-              ))}
-              <Text style={c.ratingText}> {profissional.avaliacao.toFixed(1)}</Text>
-            </View>
+            <Text style={c.name}>{nome}</Text>
+            <Text style={c.address}>{tipo}</Text>
           </View>
-          <View style={{ alignItems: 'flex-end', gap: 8 }}>
-            <Text style={c.price}>{profissional.precoConsultaAprox}</Text>
-            <TouchableOpacity style={c.agendarBtn}>
-              <Text style={c.agendarText}>Agendar</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={c.agendarBtn}>
+            <Text style={c.agendarText}>Ver perfil</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
