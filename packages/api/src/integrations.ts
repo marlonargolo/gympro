@@ -147,9 +147,14 @@ export async function getStudentDetail(studentId: number) {
   return resp.data;
 }
 
-export async function createInviteCode() {
-  const resp = await api.post('/api/auth/invite/create/');
-  return resp.data as { code: string };
+export async function createInviteCode(connectionType: 'personal_trainer' | 'nutritionist' = 'personal_trainer') {
+  const resp = await api.post('/api/students/invite/', { connection_type: connectionType });
+  return resp.data as { code: string; connection_type: string };
+}
+
+export async function assignNutritionPlan(planId: number, studentId: number) {
+  const resp = await api.post(`/api/nutrition/${planId}/assign/`, { student_id: studentId });
+  return resp.data;
 }
 
 export async function useInviteCode(code: string) {

@@ -10,7 +10,10 @@ export interface RegisterPayload {
   modalidade?: string;
   sexo?: string;
   fitness_goal?: string;
+  is_personal_trainer?: boolean;
+  is_nutritionist?: boolean;
   cref?: string;
+  crn?: string;
   gym_name?: string;
   specialty?: string;
 }
@@ -30,22 +33,35 @@ async function storeTokens(access: string, refresh: string) {
 export async function register(payload: RegisterPayload) {
   const resp = await api.post('/api/auth/register/', payload);
   await storeTokens(resp.data.access, resp.data.refresh);
+  if (resp.data.user) {
+    await AsyncStorage.setItem('user', JSON.stringify(resp.data.user));
+  }
   return resp.data;
 }
 
 export async function login(payload: LoginPayload) {
   const resp = await api.post('/api/auth/login/', payload);
   await storeTokens(resp.data.access, resp.data.refresh);
+  if (resp.data.user) {
+    await AsyncStorage.setItem('user', JSON.stringify(resp.data.user));
+  }
   return resp.data;
 }
 
-export async function logout(refreshToken: string) {
-  await api.post('/api/auth/logout/', { refresh: refreshToken });
-  await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+export async function logout(refreshToken?: string) {
+  try {
+    if (refreshToken) {
+      await api.post('/api/auth/logout/', { refresh: refreshToken });
+    }
+  } catch {}
+  await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user']);
 }
 
 export async function getMe() {
   const resp = await api.get('/api/auth/me/');
+  if (resp.data) {
+    await AsyncStorage.setItem('user', JSON.stringify(resp.data));
+  }
   return resp.data;
 }
 
@@ -62,11 +78,6 @@ export async function changePassword(oldPassword: string, newPassword: string) {
   return resp.data;
 }
 
-export async function useInviteCode(code: string) {
-  const resp = await api.post('/api/auth/use-invite/', { code });
-  return resp.data;
-}
-
 export async function getStoredTokens() {
   const result = await AsyncStorage.multiGet(['access_token', 'refresh_token']);
   return {
@@ -78,4 +89,13 @@ export async function getStoredTokens() {
 export async function isLoggedIn() {
   const { access } = await getStoredTokens();
   return !!access;
+}
+
+export async function getStoredUser(): Promise<any | null> {
+  try {
+    const raw = await AsyncStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
