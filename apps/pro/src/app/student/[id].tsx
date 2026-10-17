@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react';
 import {
   ScrollView,
   View,
@@ -5,20 +6,57 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { getStudentFicha } from '@gympro/api';
 import { Colors } from '../../constants/colors';
-import {
-  MOCK_STUDENTS,
-  MOCK_WORKOUTS,
-  MOCK_WORKOUT_LOGS,
-  MOCK_NUTRITION_PLANS,
-  MOCK_PROGRESS,
-  MOCK_SESSIONS,
-} from '@gympro/shared';
-import type { Student } from '@gympro/shared';
 
-const GOAL_LABEL: Record<Student['goal'], string> = {
+interface Ficha {
+  student: {
+    id: number;
+    modalidade?: string;
+    fitness_goal?: string;
+    birth_date?: string;
+    weight_kg?: number;
+    height_cm?: number;
+    sexo?: string;
+  };
+  user: {
+    full_name: string;
+    email: string;
+    phone?: string;
+    avatar_url?: string;
+  };
+  treinos: Array<{
+    id: number;
+    name: string;
+    descricao?: string;
+    exercicios_count?: number;
+  }>;
+  evolucao: Array<{
+    id: number;
+    peso_kg?: number;
+    gordura_corporal?: number;
+    massa_muscular?: number;
+    imc?: number;
+    created_at: string;
+  }>;
+  plano_nutricional?: {
+    id: number;
+    titulo: string;
+    calorias_diarias?: number;
+    proteinas_g?: number;
+    carboidratos_g?: number;
+    gorduras_g?: number;
+  } | null;
+  personal_trainer?: { full_name: string } | null;
+  nutritionist?: { full_name: string } | null;
+}
+
+const GOAL_LABEL: Record<string, string> = {
   hypertrophy: 'Hipertrofia',
   weight_loss: 'Emagrecimento',
   endurance: 'Resistência',
@@ -26,16 +64,37 @@ const GOAL_LABEL: Record<Student['goal'], string> = {
   health: 'Saúde',
 };
 
-const WEEKDAY_LABEL: Record<string, string> = {
-  monday: 'Seg', tuesday: 'Ter', wednesday: 'Qua',
-  thursday: 'Qui', friday: 'Sex', saturday: 'Sáb', sunday: 'Dom',
-};
-
 export default function StudentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const student = MOCK_STUDENTS.find((s) => s.id === id);
+  const [ficha, setFicha] = useState<Ficha | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  if (!student) {
+  async function loadFicha() {
+    try {
+      const data = await getStudentFicha(Number(id));
+      setFicha(data);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível carregar a ficha do aluno.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => { loadFicha(); }, [id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!ficha) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
@@ -45,120 +104,90 @@ export default function StudentDetailScreen() {
     );
   }
 
-  const latest = student.metrics[student.metrics.length - 1];
-  const prev = student.metrics[student.metrics.length - 2];
-  const weightDelta = prev ? latest.weight - prev.weight : 0;
-  const fatDelta = prev && latest.bodyFat && prev.bodyFat ? latest.bodyFat - prev.bodyFat : 0;
+  const { student, user } = ficha;
+  const initials = user.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+  const latest = ficha.evolucao[ficha.evolucao.length - 1];
+  const prev = ficha.evolucao[ficha.evolucao.length - 2];
 
-  const assignedWorkouts = MOCK_WORKOUTS.filter((w) => w.assignedTo === student.id);
-  const studentLogs = MOCK_WORKOUT_LOGS.filter((l) => l.studentId === student.id);
-  const nutritionPlan = MOCK_NUTRITION_PLANS.find((n) => n.studentId === student.id);
-  const sessions = MOCK_SESSIONS.filter((s) => s.studentId === student.id);
-  const progress = MOCK_PROGRESS.filter((p) => p.studentId === student.id);
+  const weight = latest?.peso_kg ?? student.weight_kg;
+  const prevWeight = prev?.peso_kg;
+  const weightDelta = weight && prevWeight ? weight - prevWeight : null;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Header */}
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFicha(); }} tintColor={Colors.primary} />}
+      >
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {student.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-            </Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View>
-            <Text style={styles.name}>{student.name}</Text>
-            <Text style={styles.goal}>{GOAL_LABEL[student.goal]}</Text>
-          </View>
-        </View>
-
-        {/* Body Metrics */}
-        <Text style={styles.sectionTitle}>Métricas Corporais</Text>
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>⚖️</Text>
-            <Text style={styles.metricValue}>{latest.weight} kg</Text>
-            <Text style={styles.metricLabel}>Peso</Text>
-            <Text style={[styles.metricDelta, { color: weightDelta <= 0 ? Colors.success : Colors.danger }]}>
-              {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)} kg
+            <Text style={styles.name}>{user.full_name}</Text>
+            <Text style={styles.goal}>
+              {student.fitness_goal ? (GOAL_LABEL[student.fitness_goal] || student.fitness_goal) : 'Sem objetivo definido'}
             </Text>
           </View>
-          {latest.bodyFat && (
-            <View style={styles.metricCard}>
-              <Text style={styles.metricIcon}>📊</Text>
-              <Text style={styles.metricValue}>{latest.bodyFat}%</Text>
-              <Text style={styles.metricLabel}>Gordura</Text>
-              <Text style={[styles.metricDelta, { color: fatDelta <= 0 ? Colors.success : Colors.danger }]}>
-                {fatDelta > 0 ? '+' : ''}{fatDelta.toFixed(1)}%
-              </Text>
-            </View>
-          )}
-          {latest.muscleMass && (
-            <View style={styles.metricCard}>
-              <Text style={styles.metricIcon}>💪</Text>
-              <Text style={styles.metricValue}>{latest.muscleMass} kg</Text>
-              <Text style={styles.metricLabel}>Massa</Text>
-              <Text style={[styles.metricDelta, { color: Colors.success }]}>+1 kg</Text>
-            </View>
-          )}
-          <View style={styles.metricCard}>
-            <Text style={styles.metricIcon}>📏</Text>
-            <Text style={styles.metricValue}>{latest.height} cm</Text>
-            <Text style={styles.metricLabel}>Altura</Text>
-            <Text style={styles.metricDelta}>—</Text>
-          </View>
         </View>
 
-        {/* Progress */}
-        {progress.length > 0 && (
+        {user.email && (
+          <View style={styles.contactCard}>
+            <Text style={styles.contactItem}>📧 {user.email}</Text>
+            {user.phone && <Text style={styles.contactItem}>📱 {user.phone}</Text>}
+          </View>
+        )}
+
+        {(weight || student.height_cm) && (
           <>
-            <Text style={styles.sectionTitle}>Progresso</Text>
-            <View style={styles.progressCard}>
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Treinos este mês</Text>
-                <Text style={styles.progressValue}>{progress[progress.length - 1].workoutsThisMonth}</Text>
-              </View>
-              {progress[progress.length - 1].nutritionAdherence !== undefined && (
-                <View style={styles.progressRow}>
-                  <Text style={styles.progressLabel}>Aderência à dieta</Text>
-                  <Text style={[styles.progressValue, { color: Colors.success }]}>
-                    {progress[progress.length - 1].nutritionAdherence}%
-                  </Text>
+            <Text style={styles.sectionTitle}>Métricas Corporais</Text>
+            <View style={styles.metricsGrid}>
+              {weight && (
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricIcon}>⚖️</Text>
+                  <Text style={styles.metricValue}>{weight} kg</Text>
+                  <Text style={styles.metricLabel}>Peso</Text>
+                  {weightDelta !== null && (
+                    <Text style={[styles.metricDelta, { color: weightDelta <= 0 ? Colors.success : Colors.danger }]}>
+                      {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)} kg
+                    </Text>
+                  )}
                 </View>
               )}
-              <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>Total de treinos registados</Text>
-                <Text style={styles.progressValue}>{studentLogs.length}</Text>
-              </View>
+              {student.height_cm && (
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricIcon}>📏</Text>
+                  <Text style={styles.metricValue}>{student.height_cm} cm</Text>
+                  <Text style={styles.metricLabel}>Altura</Text>
+                  <Text style={styles.metricDelta}>—</Text>
+                </View>
+              )}
+              {latest?.gordura_corporal && (
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricIcon}>📊</Text>
+                  <Text style={styles.metricValue}>{latest.gordura_corporal}%</Text>
+                  <Text style={styles.metricLabel}>Gordura</Text>
+                  <Text style={styles.metricDelta}>—</Text>
+                </View>
+              )}
+              {latest?.massa_muscular && (
+                <View style={styles.metricCard}>
+                  <Text style={styles.metricIcon}>💪</Text>
+                  <Text style={styles.metricValue}>{latest.massa_muscular} kg</Text>
+                  <Text style={styles.metricLabel}>Massa</Text>
+                  <Text style={styles.metricDelta}>—</Text>
+                </View>
+              )}
             </View>
           </>
         )}
 
-        {/* Scheduled sessions */}
-        <Text style={styles.sectionTitle}>Treinos na Semana</Text>
-        {sessions.length === 0 ? (
-          <Text style={styles.emptyText}>Nenhuma sessão agendada</Text>
-        ) : (
-          sessions.map((sess) => {
-            const wkt = MOCK_WORKOUTS.find((w) => w.id === sess.workoutId);
-            return (
-              <View key={sess.id} style={styles.sessionRow}>
-                <View style={styles.sessionDay}>
-                  <Text style={styles.sessionDayText}>{WEEKDAY_LABEL[sess.weekDay]}</Text>
-                  <Text style={styles.sessionTime}>{sess.time}</Text>
-                </View>
-                <Text style={styles.sessionWorkout}>{wkt?.name ?? '—'}</Text>
-              </View>
-            );
-          })
-        )}
-
-        {/* Workouts assigned */}
         <Text style={styles.sectionTitle}>Treinos Atribuídos</Text>
-        {assignedWorkouts.length === 0 ? (
+        {ficha.treinos.length === 0 ? (
           <Text style={styles.emptyText}>Nenhum treino atribuído</Text>
         ) : (
-          assignedWorkouts.map((w) => (
+          ficha.treinos.map((w) => (
             <TouchableOpacity
               key={w.id}
               style={styles.workoutRow}
@@ -166,61 +195,88 @@ export default function StudentDetailScreen() {
             >
               <View>
                 <Text style={styles.workoutName}>{w.name}</Text>
-                <Text style={styles.workoutMeta}>
-                  {w.exercises.length} exercícios · {w.durationMinutes} min
-                </Text>
+                {w.exercicios_count !== undefined && (
+                  <Text style={styles.workoutMeta}>{w.exercicios_count} exercícios</Text>
+                )}
               </View>
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           ))
         )}
 
-        {/* Nutrition plan summary */}
-        {nutritionPlan && (
+        {ficha.plano_nutricional && (
           <>
             <Text style={styles.sectionTitle}>Plano Nutricional</Text>
             <View style={styles.nutritionCard}>
-              <Text style={styles.nutritionName}>{nutritionPlan.name}</Text>
-              <View style={styles.macroRow}>
-                <View style={styles.macroItem}>
-                  <Text style={styles.macroValue}>{nutritionPlan.dailyCalories}</Text>
-                  <Text style={styles.macroLabel}>kcal</Text>
+              <Text style={styles.nutritionName}>{ficha.plano_nutricional.titulo}</Text>
+              {(ficha.plano_nutricional.calorias_diarias || ficha.plano_nutricional.proteinas_g) && (
+                <View style={styles.macroRow}>
+                  {ficha.plano_nutricional.calorias_diarias && (
+                    <View style={styles.macroItem}>
+                      <Text style={styles.macroValue}>{ficha.plano_nutricional.calorias_diarias}</Text>
+                      <Text style={styles.macroLabel}>kcal</Text>
+                    </View>
+                  )}
+                  {ficha.plano_nutricional.proteinas_g && (
+                    <>
+                      <View style={styles.macroDivider} />
+                      <View style={styles.macroItem}>
+                        <Text style={[styles.macroValue, { color: Colors.danger }]}>
+                          {ficha.plano_nutricional.proteinas_g}g
+                        </Text>
+                        <Text style={styles.macroLabel}>Proteína</Text>
+                      </View>
+                    </>
+                  )}
+                  {ficha.plano_nutricional.carboidratos_g && (
+                    <>
+                      <View style={styles.macroDivider} />
+                      <View style={styles.macroItem}>
+                        <Text style={[styles.macroValue, { color: Colors.warning }]}>
+                          {ficha.plano_nutricional.carboidratos_g}g
+                        </Text>
+                        <Text style={styles.macroLabel}>Carbo</Text>
+                      </View>
+                    </>
+                  )}
+                  {ficha.plano_nutricional.gorduras_g && (
+                    <>
+                      <View style={styles.macroDivider} />
+                      <View style={styles.macroItem}>
+                        <Text style={[styles.macroValue, { color: Colors.success }]}>
+                          {ficha.plano_nutricional.gorduras_g}g
+                        </Text>
+                        <Text style={styles.macroLabel}>Gordura</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                <View style={styles.macroDivider} />
-                <View style={styles.macroItem}>
-                  <Text style={[styles.macroValue, { color: Colors.danger }]}>
-                    {nutritionPlan.dailyProtein}g
-                  </Text>
-                  <Text style={styles.macroLabel}>Proteína</Text>
-                </View>
-                <View style={styles.macroDivider} />
-                <View style={styles.macroItem}>
-                  <Text style={[styles.macroValue, { color: Colors.warning }]}>
-                    {nutritionPlan.dailyCarbs}g
-                  </Text>
-                  <Text style={styles.macroLabel}>Carboidrato</Text>
-                </View>
-                <View style={styles.macroDivider} />
-                <View style={styles.macroItem}>
-                  <Text style={[styles.macroValue, { color: Colors.success }]}>
-                    {nutritionPlan.dailyFat}g
-                  </Text>
-                  <Text style={styles.macroLabel}>Gordura</Text>
-                </View>
-              </View>
+              )}
             </View>
           </>
         )}
 
-        {/* Actions */}
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>💬 Mensagem</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]}>
-            <Text style={[styles.actionBtnText, { color: Colors.primary }]}>+ Treino</Text>
-          </TouchableOpacity>
-        </View>
+        {ficha.evolucao.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Histórico de Evolução</Text>
+            <View style={styles.evolutionCard}>
+              {ficha.evolucao.slice(-3).reverse().map((ev) => (
+                <View key={ev.id} style={styles.evolutionRow}>
+                  <Text style={styles.evolutionDate}>
+                    {new Date(ev.created_at).toLocaleDateString('pt-BR')}
+                  </Text>
+                  <View style={styles.evolutionMetrics}>
+                    {ev.peso_kg && <Text style={styles.evolutionValue}>⚖️ {ev.peso_kg} kg</Text>}
+                    {ev.gordura_corporal && <Text style={styles.evolutionValue}>📊 {ev.gordura_corporal}%</Text>}
+                    {ev.imc && <Text style={styles.evolutionValue}>IMC {ev.imc}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -236,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     marginTop: 16,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatar: {
     width: 56,
@@ -249,6 +305,16 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '700', fontSize: 18 },
   name: { fontSize: 20, fontWeight: '700', color: Colors.text },
   goal: { fontSize: 13, color: Colors.textMuted, marginTop: 2 },
+  contactCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  contactItem: { color: Colors.textMuted, fontSize: 14 },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
@@ -270,40 +336,7 @@ const styles = StyleSheet.create({
   metricIcon: { fontSize: 20, marginBottom: 6 },
   metricValue: { fontSize: 18, fontWeight: '700', color: Colors.text },
   metricLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  metricDelta: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  progressCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 10,
-  },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: Colors.textMuted, fontSize: 14 },
-  progressValue: { color: Colors.text, fontWeight: '600', fontSize: 14 },
-  sessionRow: {
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  sessionDay: {
-    backgroundColor: Colors.primary + '22',
-    borderRadius: 8,
-    padding: 8,
-    alignItems: 'center',
-    minWidth: 50,
-  },
-  sessionDayText: { color: Colors.primary, fontWeight: '700', fontSize: 13 },
-  sessionTime: { color: Colors.primary, fontSize: 11, marginTop: 2 },
-  sessionWorkout: { color: Colors.text, fontSize: 14, fontWeight: '500', flex: 1 },
+  metricDelta: { fontSize: 12, fontWeight: '600', marginTop: 4, color: Colors.textMuted },
   workoutRow: {
     backgroundColor: Colors.surface,
     borderRadius: 10,
@@ -333,18 +366,17 @@ const styles = StyleSheet.create({
   macroLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
   macroDivider: { width: 1, backgroundColor: Colors.border },
   emptyText: { color: Colors.textMuted, fontSize: 14, marginBottom: 16 },
-  actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 32, marginTop: 8 },
-  actionBtn: {
-    flex: 1,
-    backgroundColor: Colors.primary,
+  evolutionCard: {
+    backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  actionBtnSecondary: {
-    backgroundColor: 'transparent',
+    padding: 14,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.border,
+    gap: 10,
   },
-  actionBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  evolutionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  evolutionDate: { color: Colors.textMuted, fontSize: 13 },
+  evolutionMetrics: { flexDirection: 'row', gap: 12 },
+  evolutionValue: { color: Colors.text, fontSize: 13, fontWeight: '500' },
 });
