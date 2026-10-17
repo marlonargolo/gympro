@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   View,
@@ -5,91 +6,110 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
-import { MOCK_PROFESSIONALS, MOCK_STUDENTS, MOCK_WORKOUTS, MOCK_SESSIONS } from '@gympro/shared';
+import { getMyStudents } from '@gympro/api';
 
-const PRO = MOCK_PROFESSIONALS[0];
+interface Student {
+  id: number;
+  user: { full_name: string; email: string };
+  fitness_goal?: string;
+  personal_trainer?: unknown;
+  nutritionist?: unknown;
+}
 
 const DAYS = [
-  { key: 'monday', label: 'Seg' },
-  { key: 'tuesday', label: 'Ter' },
-  { key: 'wednesday', label: 'Qua' },
-  { key: 'thursday', label: 'Qui' },
-  { key: 'friday', label: 'Sex' },
-  { key: 'saturday', label: 'Sáb' },
-  { key: 'sunday', label: 'Dom' },
+  { key: 'dom', label: 'Dom' },
+  { key: 'seg', label: 'Seg' },
+  { key: 'ter', label: 'Ter' },
+  { key: 'qua', label: 'Qua' },
+  { key: 'qui', label: 'Qui' },
+  { key: 'sex', label: 'Sex' },
+  { key: 'sab', label: 'Sáb' },
 ];
 
-const JS_TO_KEY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const todayKey = JS_TO_KEY[new Date().getDay()];
+const JS_DAY_INDEX = new Date().getDay();
+
+const GOAL_LABEL: Record<string, string> = {
+  hipertrofia: 'Hipertrofia',
+  emagrecimento: 'Emagrecimento',
+  saude: 'Saúde',
+  condicionamento: 'Condicionamento',
+};
 
 export default function ScheduleProScreen() {
-  const mySessions = MOCK_SESSIONS.filter((s) => s.professionalId === PRO.id);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMyStudents()
+      .then((data) => setStudents(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.pageTitle}>Agenda</Text>
 
+        {/* Week strip (visual only) */}
         <View style={styles.weekRow}>
-          {DAYS.map((d) => {
-            const count = mySessions.filter((s) => s.weekDay === d.key).length;
-            const isToday = d.key === todayKey;
+          {DAYS.map((d, i) => {
+            const isToday = i === JS_DAY_INDEX;
             return (
               <View key={d.key} style={[styles.dayCell, isToday && styles.dayCellActive]}>
                 <Text style={[styles.dayLabel, isToday && styles.dayLabelActive]}>{d.label}</Text>
-                {count > 0 && (
-                  <View style={[styles.sessionCount, isToday && styles.sessionCountActive]}>
-                    <Text style={[styles.sessionCountText, isToday && styles.sessionCountTextActive]}>
-                      {count}
-                    </Text>
-                  </View>
-                )}
               </View>
             );
           })}
         </View>
 
-        {DAYS.map((d) => {
-          const daySessions = mySessions
-            .filter((s) => s.weekDay === d.key)
-            .sort((a, b) => a.time.localeCompare(b.time));
-          if (daySessions.length === 0) return null;
+        <View style={styles.comingSoonBanner}>
+          <Text style={styles.comingSoonText}>📅 Agendamento integrado — Em breve</Text>
+        </View>
 
-          return (
-            <View key={d.key}>
-              <Text style={styles.dayHeader}>{d.label}feira</Text>
-              {daySessions.map((sess) => {
-                const student = MOCK_STUDENTS.find((s) => s.id === sess.studentId);
-                const workout = MOCK_WORKOUTS.find((w) => w.id === sess.workoutId);
-                return (
-                  <TouchableOpacity
-                    key={sess.id}
-                    style={styles.sessionCard}
-                    onPress={() => router.push(`/student/${sess.studentId}` as any)}
-                  >
-                    <View style={styles.sessionTime}>
-                      <Text style={styles.sessionTimeText}>{sess.time}</Text>
-                    </View>
-                    <View style={styles.sessionInfo}>
-                      <Text style={styles.sessionStudent}>{student?.name ?? '—'}</Text>
-                      <Text style={styles.sessionWorkout}>{workout?.name ?? '—'}</Text>
-                    </View>
-                    <View style={styles.sessionAvatar}>
-                      <Text style={styles.sessionAvatarText}>
-                        {student?.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          );
-        })}
+        <Text style={styles.sectionTitle}>Seus Alunos ({students.length})</Text>
 
-        <TouchableOpacity style={styles.addButton}>
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} />
+        ) : students.length === 0 ? (
+          <Text style={styles.emptyText}>Nenhum aluno vinculado ainda.</Text>
+        ) : (
+          students.map((student) => (
+            <TouchableOpacity
+              key={student.id}
+              style={styles.studentCard}
+              onPress={() => router.push(`/student/${student.id}` as any)}
+            >
+              <View style={styles.studentAvatar}>
+                <Text style={styles.studentAvatarText}>
+                  {student.user.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.studentInfo}>
+                <Text style={styles.studentName}>{student.user.full_name}</Text>
+                <Text style={styles.studentGoal}>
+                  {GOAL_LABEL[student.fitness_goal ?? ''] ?? student.fitness_goal ?? '—'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.agendarBtn}
+                onPress={() => Alert.alert('Em breve', 'Agendamento integrado em breve.')}
+              >
+                <Text style={styles.agendarBtnText}>Agendar</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))
+        )}
+
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => Alert.alert('Em breve', 'Agendamento integrado em breve.')}
+        >
           <Text style={styles.addButtonText}>+ Agendar Sessão</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -101,65 +121,60 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   container: { flex: 1, paddingHorizontal: 16 },
   pageTitle: { fontSize: 26, fontWeight: '700', color: Colors.text, marginTop: 24, marginBottom: 20 },
-  weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
+  weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   dayCell: {
     alignItems: 'center',
     padding: 8,
     borderRadius: 10,
     minWidth: 38,
-    gap: 4,
   },
   dayCellActive: { backgroundColor: Colors.primary },
   dayLabel: { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
   dayLabelActive: { color: '#fff' },
-  sessionCount: {
-    backgroundColor: Colors.primary + '33',
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+  comingSoonBanner: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 20,
+    alignItems: 'center',
   },
-  sessionCountActive: { backgroundColor: '#ffffff33' },
-  sessionCountText: { color: Colors.primary, fontSize: 11, fontWeight: '700' },
-  sessionCountTextActive: { color: '#fff' },
-  dayHeader: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  sessionCard: {
+  comingSoonText: { color: Colors.textMuted, fontSize: 13 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 12 },
+  emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', marginVertical: 16 },
+  studentCard: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 12,
   },
-  sessionTime: {
-    backgroundColor: Colors.primary + '22',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    alignItems: 'center',
-    minWidth: 52,
-  },
-  sessionTimeText: { color: Colors.primary, fontWeight: '700', fontSize: 13 },
-  sessionInfo: { flex: 1 },
-  sessionStudent: { color: Colors.text, fontWeight: '600', fontSize: 14 },
-  sessionWorkout: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
-  sessionAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surfaceAlt,
+  studentAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sessionAvatarText: { color: Colors.text, fontWeight: '700', fontSize: 11 },
+  studentAvatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  studentInfo: { flex: 1 },
+  studentName: { color: Colors.text, fontWeight: '600', fontSize: 15 },
+  studentGoal: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
+  agendarBtn: {
+    backgroundColor: Colors.primary + '22',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  agendarBtnText: { color: Colors.primary, fontWeight: '600', fontSize: 12 },
   addButton: {
     borderWidth: 2,
     borderColor: Colors.primary,

@@ -1,13 +1,34 @@
 // GymsAndProfessionalsMapViews — premium dark UI rewrite
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView, TextInput,
-  TouchableOpacity, Modal, FlatList,
+  TouchableOpacity, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
-import { mockAcademias, mockProfissionaisMapa } from '../data/mock-data';
-import type { Academia } from '../data/types';
+import { getNearbyGyms, getConnections } from '@gympro/api';
+
+// SP fallback coords (expo-location not installed)
+const SP_LAT = -23.55;
+const SP_LNG = -46.63;
+
+interface Academia {
+  id: string;
+  nome: string;
+  endereco: string;
+  avaliacao: number;
+  modalidades: string[];
+  distance_km?: number;
+  is_open?: boolean;
+}
+
+interface Connection {
+  id: number;
+  connection_type: string;
+  status: string;
+  requester_name: string | null;
+  target_name: string | null;
+}
 
 const MODALIDADES_OPCOES = [
   'Musculação', 'Crossfit', 'Yoga', 'Pilates', 'Natação',
@@ -18,8 +39,30 @@ type Tab = 'academias' | 'profissionais';
 
 export default function MapsScreen() {
   const [tab, setTab] = useState<Tab>('academias');
-  const [academias, setAcademias] = useState(mockAcademias);
+  const [academias, setAcademias] = useState<Academia[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      getNearbyGyms(SP_LAT, SP_LNG, 20),
+      getConnections('accepted'),
+    ]).then(([gymsData, connsData]: [any[], any[]]) => {
+      const mapped: Academia[] = (Array.isArray(gymsData) ? gymsData : []).map(g => ({
+        id: String(g.id),
+        nome: g.gym_name ?? g.name ?? '—',
+        endereco: g.gym_address ?? g.address ?? '—',
+        avaliacao: 0,
+        modalidades: g.specialty ? [g.specialty] : [],
+        distance_km: g.distance_km,
+      }));
+      setAcademias(mapped);
+      setConnections(Array.isArray(connsData) ? connsData : []);
+    })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -74,10 +117,12 @@ export default function MapsScreen() {
         {tab === 'academias' ? (
           <>
             <Text style={s.sectionLabel}>
-              {academias.length} ACADEMIAS ENCONTRADAS
+              {loading ? 'BUSCANDO...' : `${academias.length} ACADEMIAS ENCONTRADAS`}
             </Text>
-            {academias.length === 0 ? (
-              <EmptyState icon="barbell-outline" text="Nenhuma academia cadastrada" />
+            {loading ? (
+              <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : academias.length === 0 ? (
+              <EmptyState icon="barbell-outline" text="Nenhuma academia encontrada" />
             ) : (
               academias.map(ac => <AcademiaCard key={ac.id} academia={ac} />)
             )}
@@ -85,12 +130,14 @@ export default function MapsScreen() {
         ) : (
           <>
             <Text style={s.sectionLabel}>
-              {mockProfissionaisMapa.length} PROFISSIONAIS ENCONTRADOS
+              {loading ? 'BUSCANDO...' : `${connections.length} PROFISSIONAIS VINCULADOS`}
             </Text>
-            {mockProfissionaisMapa.length === 0 ? (
-              <EmptyState icon="person-outline" text="Nenhum profissional encontrado" />
+            {loading ? (
+              <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : connections.length === 0 ? (
+              <EmptyState icon="person-outline" text="Nenhum profissional vinculado" />
             ) : (
-              mockProfissionaisMapa.map(pro => (
+              connections.map(pro => (
                 <ProfissionalCard key={pro.id} profissional={pro} />
               ))
             )}
@@ -115,7 +162,6 @@ export default function MapsScreen() {
 function AcademiaCard({ academia }: { academia: Academia }) {
   return (
     <View style={c.card}>
-      {/* top accent strip */}
       <View style={c.topStrip} />
       <View style={c.cardInner}>
         <View style={c.cardRow}>
@@ -126,9 +172,21 @@ function AcademiaCard({ academia }: { academia: Academia }) {
             <Text style={c.name}>{academia.nome}</Text>
             <Text style={c.address}>{academia.endereco}</Text>
           </View>
-          <View style={c.ratingChip}>
-            <Ionicons name="star" size={11} color={Colors.primary2} />
-            <Text style={c.ratingText}> {academia.avaliacao.toFixed(1)}</Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <View style={c.ratingChip}>
+              <Ionicons name="star" size={11} color={Colors.primary2} />
+              <Text style={c.ratingText}> {academia.avaliacao.toFixed(1)}</Text>
+            </View>
+            {academia.distance_km !== undefined && (
+              <Text style={c.distText}>{academia.distance_km.toFixed(1)} km</Text>
+            )}
+            {academia.is_open !== undefined && (
+              <View style={[c.openChip, { backgroundColor: academia.is_open ? Colors.success + '22' : '#FF6B6B22' }]}>
+                <Text style={[c.openText, { color: academia.is_open ? Colors.success : '#FF6B6B' }]}>
+                  {academia.is_open ? 'Aberta' : 'Fechada'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         {academia.modalidades.length > 0 && (
@@ -145,7 +203,9 @@ function AcademiaCard({ academia }: { academia: Academia }) {
   );
 }
 
-function ProfissionalCard({ profissional }: { profissional: { id: string; nome: string; especialidade: string; avaliacao: number; precoConsultaAprox: string } }) {
+function ProfissionalCard({ profissional }: { profissional: Connection }) {
+  const nome = profissional.target_name ?? profissional.requester_name ?? 'Profissional';
+  const tipo = profissional.connection_type === 'nutritionist' ? 'Nutricionista' : 'Personal Trainer';
   return (
     <View style={c.card}>
       <View style={[c.topStrip, { backgroundColor: Colors.accent }]} />
@@ -155,26 +215,12 @@ function ProfissionalCard({ profissional }: { profissional: { id: string; nome: 
             <Ionicons name="person" size={22} color={Colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={c.name}>{profissional.nome}</Text>
-            <Text style={c.address}>{profissional.especialidade}</Text>
-            <View style={c.ratingRow}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Ionicons
-                  key={i}
-                  name={i < Math.floor(profissional.avaliacao) ? 'star' : 'star-outline'}
-                  size={11}
-                  color={Colors.primary2}
-                />
-              ))}
-              <Text style={c.ratingText}> {profissional.avaliacao.toFixed(1)}</Text>
-            </View>
+            <Text style={c.name}>{nome}</Text>
+            <Text style={c.address}>{tipo}</Text>
           </View>
-          <View style={{ alignItems: 'flex-end', gap: 8 }}>
-            <Text style={c.price}>{profissional.precoConsultaAprox}</Text>
-            <TouchableOpacity style={c.agendarBtn}>
-              <Text style={c.agendarText}>Agendar</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={c.agendarBtn}>
+            <Text style={c.agendarText}>Ver perfil</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -346,6 +392,9 @@ const c = StyleSheet.create({
     paddingHorizontal: 9, paddingVertical: 4,
   },
   tagText: { fontSize: 11, color: Colors.textTertiary, fontWeight: '600' },
+  distText: { fontSize: 11, color: Colors.textTertiary, fontWeight: '600' },
+  openChip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  openText: { fontSize: 10, fontWeight: '700' },
   price: { fontSize: 14, fontWeight: '700', color: Colors.primary2 },
   agendarBtn: {
     backgroundColor: Colors.accent, borderRadius: 10,

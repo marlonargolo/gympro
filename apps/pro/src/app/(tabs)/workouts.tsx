@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   View,
@@ -5,97 +6,167 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
-import { MOCK_WORKOUTS, MOCK_STUDENTS, MOCK_PROFESSIONALS } from '@gympro/shared';
+import { getWorkouts, createWorkout } from '@gympro/api';
 
-const PRO = MOCK_PROFESSIONALS[0];
-
-const MUSCLE_LABEL: Record<string, string> = {
-  chest: 'Peito', back: 'Costas', shoulders: 'Ombros',
-  biceps: 'Bíceps', triceps: 'Tríceps', legs: 'Pernas',
-  glutes: 'Glúteos', core: 'Core', cardio: 'Cardio', full_body: 'Full Body',
-};
+interface Workout {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  exercicios: unknown[];
+  duracao_estimada_min?: number;
+  assigned_to?: { id: number; user: { full_name: string } } | null;
+}
 
 export default function WorkoutsProScreen() {
-  const myWorkouts = MOCK_WORKOUTS.filter((w) => w.createdBy === PRO.id);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [titulo, setTitulo] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const templates = myWorkouts.filter((w) => !w.assignedTo);
-  const assigned = myWorkouts.filter((w) => !!w.assignedTo);
+  async function load() {
+    try {
+      const data = await getWorkouts();
+      setWorkouts(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleCreate() {
+    if (!titulo.trim()) { Alert.alert('Título obrigatório'); return; }
+    setSaving(true);
+    try {
+      await createWorkout({ titulo: titulo.trim(), descricao: descricao.trim() });
+      setTitulo('');
+      setDescricao('');
+      setShowModal(false);
+      setLoading(true);
+      await load();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível criar o treino.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const assigned = workouts.filter((w) => !!w.assigned_to);
+  const templates = workouts.filter((w) => !w.assigned_to);
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <Text style={styles.pageTitle}>Treinos</Text>
-          <TouchableOpacity style={styles.newBtn}>
+          <TouchableOpacity style={styles.newBtn} onPress={() => setShowModal(true)}>
             <Text style={styles.newBtnText}>+ Novo</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Atribuídos a Alunos ({assigned.length})</Text>
-        {assigned.map((w) => {
-          const student = MOCK_STUDENTS.find((s) => s.id === w.assignedTo);
-          return (
-            <TouchableOpacity
-              key={w.id}
-              style={styles.card}
-              onPress={() => router.push(`/workout/${w.id}` as any)}
-            >
-              <View style={styles.cardLeft}>
-                <Text style={styles.cardName}>{w.name}</Text>
-                <Text style={styles.cardMeta}>
-                  {w.exercises.length} exercícios · {w.durationMinutes} min
-                </Text>
-                <View style={styles.muscleRow}>
-                  {w.muscleGroups.slice(0, 3).map((mg) => (
-                    <View key={mg} style={styles.musclePill}>
-                      <Text style={styles.musclePillText}>{MUSCLE_LABEL[mg] ?? mg}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.cardRight}>
-                {student && (
-                  <View style={styles.studentBadge}>
-                    <View style={styles.studentBadgeAvatar}>
-                      <Text style={styles.studentBadgeAvatarText}>
-                        {student.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                      </Text>
-                    </View>
-                    <Text style={styles.studentBadgeName} numberOfLines={1}>
-                      {student.name.split(' ')[0]}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        {templates.length > 0 && (
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+        ) : (
           <>
-            <Text style={styles.sectionTitle}>Templates ({templates.length})</Text>
-            {templates.map((w) => (
-              <TouchableOpacity key={w.id} style={styles.card}>
+            <Text style={styles.sectionTitle}>Atribuídos a Alunos ({assigned.length})</Text>
+            {assigned.length === 0 && (
+              <Text style={styles.emptyText}>Nenhum treino atribuído.</Text>
+            )}
+            {assigned.map((w) => (
+              <TouchableOpacity
+                key={w.id}
+                style={styles.card}
+                onPress={() => router.push(`/workout/${w.id}` as any)}
+              >
                 <View style={styles.cardLeft}>
-                  <Text style={styles.cardName}>{w.name}</Text>
+                  <Text style={styles.cardName}>{w.titulo}</Text>
                   <Text style={styles.cardMeta}>
-                    {w.exercises.length} exercícios · {w.durationMinutes} min
+                    {w.exercicios.length} exercício{w.exercicios.length !== 1 ? 's' : ''}
+                    {w.duracao_estimada_min ? ` · ${w.duracao_estimada_min} min` : ''}
                   </Text>
+                  {w.assigned_to && (
+                    <Text style={styles.assignedTo}>→ {w.assigned_to.user.full_name}</Text>
+                  )}
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </TouchableOpacity>
             ))}
+
+            {templates.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Templates ({templates.length})</Text>
+                {templates.map((w) => (
+                  <TouchableOpacity
+                    key={w.id}
+                    style={styles.card}
+                    onPress={() => router.push(`/workout/${w.id}` as any)}
+                  >
+                    <View style={styles.cardLeft}>
+                      <Text style={styles.cardName}>{w.titulo}</Text>
+                      <Text style={styles.cardMeta}>
+                        {w.exercicios.length} exercício{w.exercicios.length !== 1 ? 's' : ''}
+                        {w.duracao_estimada_min ? ` · ${w.duracao_estimada_min} min` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.chevron}>›</Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+
+            <TouchableOpacity style={styles.addButton} onPress={() => setShowModal(true)}>
+              <Text style={styles.addButtonText}>+ Criar Treino</Text>
+            </TouchableOpacity>
           </>
         )}
-
-        <TouchableOpacity style={styles.addButton}>
-          <Text style={styles.addButtonText}>+ Criar Treino</Text>
-        </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowModal(false)}>
+        <View style={modal.container}>
+          <View style={modal.header}>
+            <Text style={modal.title}>Novo Treino</Text>
+            <TouchableOpacity onPress={() => setShowModal(false)}>
+              <Text style={modal.close}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={modal.label}>TÍTULO</Text>
+          <TextInput
+            style={modal.input}
+            placeholder="Ex: Treino A — Peito e Tríceps"
+            placeholderTextColor={Colors.textMuted}
+            value={titulo}
+            onChangeText={setTitulo}
+          />
+          <Text style={modal.label}>DESCRIÇÃO (opcional)</Text>
+          <TextInput
+            style={[modal.input, { height: 80 }]}
+            placeholder="Descrição do treino..."
+            placeholderTextColor={Colors.textMuted}
+            value={descricao}
+            onChangeText={setDescricao}
+            multiline
+            textAlignVertical="top"
+          />
+          <TouchableOpacity
+            style={[modal.saveBtn, saving && { opacity: 0.6 }]}
+            onPress={handleCreate}
+            disabled={saving}
+          >
+            <Text style={modal.saveBtnText}>{saving ? 'Criando...' : 'Criar Treino'}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -118,7 +189,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   newBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 10, marginTop: 4 },
+  emptyText: { color: Colors.textMuted, fontSize: 14, marginBottom: 12 },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -132,27 +204,8 @@ const styles = StyleSheet.create({
   },
   cardLeft: { flex: 1 },
   cardName: { color: Colors.text, fontWeight: '600', fontSize: 15, marginBottom: 2 },
-  cardMeta: { color: Colors.textMuted, fontSize: 12, marginBottom: 6 },
-  muscleRow: { flexDirection: 'row', gap: 4 },
-  musclePill: {
-    backgroundColor: Colors.primary + '22',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  musclePillText: { color: Colors.primary, fontSize: 10, fontWeight: '600' },
-  cardRight: { alignItems: 'flex-end', gap: 8, marginLeft: 10 },
-  studentBadge: { alignItems: 'center', gap: 3 },
-  studentBadgeAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.surfaceAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  studentBadgeAvatarText: { color: Colors.text, fontSize: 10, fontWeight: '700' },
-  studentBadgeName: { color: Colors.textMuted, fontSize: 10, maxWidth: 50 },
+  cardMeta: { color: Colors.textMuted, fontSize: 12, marginBottom: 4 },
+  assignedTo: { color: Colors.primary, fontSize: 12, fontWeight: '600' },
   chevron: { fontSize: 22, color: Colors.textMuted },
   addButton: {
     borderWidth: 2,
@@ -165,4 +218,29 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   addButtonText: { color: Colors.primary, fontWeight: '600', fontSize: 16 },
+});
+
+const modal = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background, padding: 20, gap: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  title: { fontSize: 20, fontWeight: '700', color: Colors.text },
+  close: { fontSize: 20, color: Colors.textMuted, padding: 4 },
+  label: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1 },
+  input: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    color: Colors.text,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  saveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

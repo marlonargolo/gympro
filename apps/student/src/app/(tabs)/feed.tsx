@@ -1,16 +1,20 @@
-// FeedScreen — Premium dark UI rewrite
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  Modal, TextInput,
+  Modal, TextInput, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
-import { useStore } from '../../context/StoreContext';
-import type { FeedPost, TipoPost } from '../../data/types';
-import { tipoPostLabel } from '../../data/types';
+import { getFeed, createPost, toggleLike } from '@gympro/api';
 
+type TipoPost = 'treino' | 'evolucao' | 'conquista';
 type Filter = TipoPost | null;
+
+const tipoPostLabel: Record<TipoPost, string> = {
+  treino: 'Treino',
+  evolucao: 'Evolução',
+  conquista: 'Conquista',
+};
 
 const filters: Array<{ key: Filter; label: string }> = [
   { key: null,        label: 'Tudo'       },
@@ -18,6 +22,16 @@ const filters: Array<{ key: Filter; label: string }> = [
   { key: 'evolucao',  label: 'Evolução'   },
   { key: 'conquista', label: 'Conquistas' },
 ];
+
+interface ApiPost {
+  id: string | number;
+  author: { full_name: string };
+  caption: string;
+  likes_count: number;
+  tipo: TipoPost;
+  is_liked: boolean;
+  created_at: string;
+}
 
 function formatRelative(date: Date): string {
   const diff = Date.now() - date.getTime();
@@ -35,13 +49,56 @@ function formatDate(date: Date): string {
 }
 
 export default function FeedScreen() {
-  const { feed, addFeedPost } = useStore();
+  const [posts, setPosts] = useState<ApiPost[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<Filter>(null);
   const [showModal, setShowModal] = useState(false);
 
-  const postsFiltrados: FeedPost[] = filtro
-    ? feed.filter((p: FeedPost) => p.tipo === filtro)
-    : feed;
+  async function load() {
+    try {
+      const data = await getFeed();
+      setPosts(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleToggleLike(postId: string | number) {
+    setPosts(prev => prev.map(p =>
+      p.id === postId
+        ? { ...p, is_liked: !p.is_liked, likes_count: p.is_liked ? p.likes_count - 1 : p.likes_count + 1 }
+        : p
+    ));
+    try {
+      await toggleLike(String(postId));
+    } catch {
+      // revert on error
+      setPosts(prev => prev.map(p =>
+        p.id === postId
+          ? { ...p, is_liked: !p.is_liked, likes_count: p.is_liked ? p.likes_count - 1 : p.likes_count + 1 }
+          : p
+      ));
+    }
+  }
+
+  async function handleCreate(caption: string, tipo: TipoPost) {
+    try {
+      await createPost({ caption, tipo });
+      setShowModal(false);
+      setLoading(true);
+      await load();
+    } catch {
+      Alert.alert('Erro', 'Não foi possível publicar.');
+    }
+  }
+
+  const postsFiltrados = filtro
+    ? posts.filter(p => p.tipo === filtro)
+    : posts;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -49,7 +106,6 @@ export default function FeedScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scroll}
       >
-        {/* ── HEADER ────────────────────────────────────────── */}
         <View style={s.headerRow}>
           <Text style={s.title}>Feed</Text>
           <TouchableOpacity
@@ -61,7 +117,6 @@ export default function FeedScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── FILTER CHIPS ──────────────────────────────────── */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -84,49 +139,59 @@ export default function FeedScreen() {
           })}
         </ScrollView>
 
-        {/* ── POSTS ─────────────────────────────────────────── */}
-        {postsFiltrados.map((post: FeedPost) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+        ) : postsFiltrados.length === 0 ? (
+          <View style={s.emptyWrap}>
+            <Ionicons name="newspaper-outline" size={40} color={Colors.textTertiary} />
+            <Text style={s.emptyText}>Nenhuma publicação</Text>
+          </View>
+        ) : (
+          postsFiltrados.map(post => (
+            <PostCard key={String(post.id)} post={post} onToggleLike={handleToggleLike} />
+          ))
+        )}
       </ScrollView>
 
       <NovoPostModal
         visible={showModal}
         onClose={() => setShowModal(false)}
-        onPublicar={(post: FeedPost) => {
-          addFeedPost(post);
-          setShowModal(false);
-        }}
+        onPublicar={handleCreate}
       />
     </SafeAreaView>
   );
 }
 
-// ─── Post Card ────────────────────────────────────────────────────────────────
-
-function PostCard({ post }: { post: FeedPost }) {
-  const [curtido, setCurtido] = useState(false);
-
+function PostCard({
+  post,
+  onToggleLike,
+}: {
+  post: ApiPost;
+  onToggleLike: (id: string | number) => void;
+}) {
   const badgeStyle = post.tipo === 'treino'
     ? { bg: Colors.primary + '22', fg: Colors.primary }
     : post.tipo === 'evolucao'
     ? { bg: Colors.success + '22', fg: Colors.success }
     : { bg: Colors.accent + '22', fg: Colors.accent };
 
+  const iconMap: Record<TipoPost, React.ComponentProps<typeof Ionicons>['name']> = {
+    treino: 'barbell',
+    evolucao: 'trending-up',
+    conquista: 'trophy',
+  };
+
+  const date = new Date(post.created_at);
+
   return (
     <View style={s.card}>
-      {/* TOP ROW */}
       <View style={s.cardTop}>
         <View style={s.avatar}>
-          <Ionicons
-            name={(post.avatarIcon as React.ComponentProps<typeof Ionicons>['name']) || 'person'}
-            size={24}
-            color={Colors.primary}
-          />
+          <Ionicons name="person" size={24} color={Colors.primary} />
         </View>
         <View style={s.authorInfo}>
-          <Text style={s.authorName}>{post.autor}</Text>
-          <Text style={s.authorTime}>{formatRelative(post.data)}</Text>
+          <Text style={s.authorName}>{post.author?.full_name ?? 'Usuário'}</Text>
+          <Text style={s.authorTime}>{formatRelative(date)}</Text>
         </View>
         <View style={[s.tipoBadge, { backgroundColor: badgeStyle.bg }]}>
           <Text style={[s.tipoBadgeText, { color: badgeStyle.fg }]}>
@@ -135,36 +200,27 @@ function PostCard({ post }: { post: FeedPost }) {
         </View>
       </View>
 
-      {/* IMAGE AREA */}
-      {post.imageIcon ? (
-        <View style={s.imageArea}>
-          <View style={[s.imageInner, { backgroundColor: badgeStyle.bg }]}>
-            <Ionicons
-              name={(post.imageIcon as React.ComponentProps<typeof Ionicons>['name']) || 'image'}
-              size={40}
-              color={badgeStyle.fg}
-            />
-          </View>
+      <View style={s.imageArea}>
+        <View style={[s.imageInner, { backgroundColor: badgeStyle.bg }]}>
+          <Ionicons name={iconMap[post.tipo]} size={40} color={badgeStyle.fg} />
         </View>
-      ) : null}
+      </View>
 
-      {/* LEGENDA */}
-      <Text style={s.legenda}>{post.legenda}</Text>
+      <Text style={s.legenda}>{post.caption}</Text>
 
-      {/* BOTTOM ROW */}
       <View style={s.bottomRow}>
         <TouchableOpacity
           style={s.actionBtn}
-          onPress={() => setCurtido(v => !v)}
+          onPress={() => onToggleLike(post.id)}
           activeOpacity={0.7}
         >
           <Ionicons
-            name={curtido ? 'heart' : 'heart-outline'}
+            name={post.is_liked ? 'heart' : 'heart-outline'}
             size={18}
-            color={curtido ? Colors.primary : Colors.textSecondary}
+            color={post.is_liked ? Colors.primary : Colors.textSecondary}
           />
-          <Text style={[s.actionText, curtido && { color: Colors.primary }]}>
-            {post.curtidas + (curtido ? 1 : 0)}
+          <Text style={[s.actionText, post.is_liked && { color: Colors.primary }]}>
+            {post.likes_count}
           </Text>
         </TouchableOpacity>
 
@@ -172,13 +228,11 @@ function PostCard({ post }: { post: FeedPost }) {
           <Ionicons name="share-outline" size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
 
-        <Text style={s.postDate}>{formatDate(post.data)}</Text>
+        <Text style={s.postDate}>{formatDate(date)}</Text>
       </View>
     </View>
   );
 }
-
-// ─── New Post Modal ───────────────────────────────────────────────────────────
 
 function NovoPostModal({
   visible,
@@ -187,30 +241,21 @@ function NovoPostModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onPublicar: (p: FeedPost) => void;
+  onPublicar: (caption: string, tipo: TipoPost) => void;
 }) {
   const [legenda, setLegenda] = useState('');
   const [tipo, setTipo] = useState<TipoPost>('treino');
+  const [saving, setSaving] = useState(false);
 
-  function publicar() {
-    const imageMap: Record<TipoPost, string> = {
-      treino: 'barbell',
-      evolucao: 'trending-up',
-      conquista: 'trophy',
-    };
-    const novo: FeedPost = {
-      id: Date.now().toString(),
-      autor: 'Eu',
-      avatarIcon: 'person',
-      imageIcon: imageMap[tipo],
-      legenda: legenda.trim() || 'Novo progresso!',
-      curtidas: 0,
-      tipo,
-      data: new Date(),
-    };
-    onPublicar(novo);
-    setLegenda('');
-    setTipo('treino');
+  async function publicar() {
+    setSaving(true);
+    try {
+      await onPublicar(legenda.trim() || 'Novo progresso!', tipo);
+      setLegenda('');
+      setTipo('treino');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const tiposModal: TipoPost[] = ['treino', 'evolucao', 'conquista'];
@@ -223,7 +268,6 @@ function NovoPostModal({
       onRequestClose={onClose}
     >
       <View style={m.container}>
-        {/* Header */}
         <View style={m.header}>
           <Text style={m.headerTitle}>Nova publicação</Text>
           <TouchableOpacity style={m.closeBtn} onPress={onClose} activeOpacity={0.7}>
@@ -231,7 +275,6 @@ function NovoPostModal({
           </TouchableOpacity>
         </View>
 
-        {/* Type selector */}
         <Text style={m.sectionLabel}>TIPO</Text>
         <View style={m.typeRow}>
           {tiposModal.map(t => (
@@ -248,7 +291,6 @@ function NovoPostModal({
           ))}
         </View>
 
-        {/* Legenda input */}
         <Text style={m.sectionLabel}>LEGENDA</Text>
         <TextInput
           style={m.input}
@@ -260,26 +302,23 @@ function NovoPostModal({
           textAlignVertical="top"
         />
 
-        {/* Publish button */}
         <TouchableOpacity
-          style={m.publishBtn}
+          style={[m.publishBtn, saving && { opacity: 0.6 }]}
           onPress={publicar}
           activeOpacity={0.85}
+          disabled={saving}
         >
-          <Text style={m.publishBtnText}>Publicar</Text>
+          <Text style={m.publishBtnText}>{saving ? 'Publicando...' : 'Publicar'}</Text>
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 18, gap: 14, paddingBottom: 40 },
 
-  // Header
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -305,7 +344,6 @@ const s = StyleSheet.create({
     elevation: 6,
   },
 
-  // Filter chips
   chipsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -341,7 +379,6 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Post card
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
@@ -356,7 +393,6 @@ const s = StyleSheet.create({
     elevation: 3,
   },
 
-  // Card top row
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,7 +431,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Image area
   imageArea: {
     width: '100%',
     height: 160,
@@ -407,8 +442,6 @@ const s = StyleSheet.create({
     borderColor: Colors.glassBorder,
     overflow: 'hidden',
   },
-
-  // Image inner
   imageInner: {
     width: 72,
     height: 72,
@@ -417,14 +450,12 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Caption
   legenda: {
     fontSize: 14,
     color: Colors.text,
     lineHeight: 20,
   },
 
-  // Bottom row
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,6 +475,16 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: Colors.textTertiary,
     marginLeft: 'auto',
+  },
+
+  emptyWrap: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: Colors.textTertiary,
   },
 });
 
