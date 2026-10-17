@@ -138,11 +138,13 @@ function PostCard({ post }: { post: FeedPost }) {
       {/* IMAGE AREA */}
       {post.imageIcon ? (
         <View style={s.imageArea}>
-          <Ionicons
-            name={(post.imageIcon as React.ComponentProps<typeof Ionicons>['name']) || 'image'}
-            size={48}
-            color={Colors.textTertiary}
-          />
+          <View style={[s.imageInner, { backgroundColor: badgeStyle.bg }]}>
+            <Ionicons
+              name={(post.imageIcon as React.ComponentProps<typeof Ionicons>['name']) || 'image'}
+              size={40}
+              color={badgeStyle.fg}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -312,10 +314,13 @@ const s = StyleSheet.create({
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
+    height: 34,
     borderRadius: 100,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
   chipAtivo: {
     backgroundColor: Colors.primary,
@@ -339,11 +344,16 @@ const s = StyleSheet.create({
   // Post card
   card: {
     backgroundColor: Colors.surface,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     padding: 16,
     gap: 12,
+    shadowColor: '#000',
+    shadowRadius: 6,
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 
   // Card top row
@@ -390,7 +400,19 @@ const s = StyleSheet.create({
     width: '100%',
     height: 160,
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    overflow: 'hidden',
+  },
+
+  // Image inner
+  imageInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
