@@ -1,5 +1,5 @@
 // HomeScreen — Premium redesign with LinearGradient + authentic feel
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
 } from 'react-native';
@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
 import { useStore } from '../../context/StoreContext';
 import { calcularTMB, calcularGET } from '../../data/calculators';
+import { getMe, getMySubscription } from '@gympro/api';
 
 function todayLabel(): string {
   return new Date().toLocaleDateString('pt-BR', {
@@ -113,7 +114,17 @@ export default function HomeScreen() {
   const { perfil } = useStore();
   const tmb = Math.round(calcularTMB(perfil));
   const get = Math.round(calcularGET(perfil));
-  const nomeDisplay = perfil.nome.trim() || 'Atleta';
+
+  const [meData, setMeData] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
+
+  useEffect(() => {
+    getMe().then(setMeData).catch(() => {});
+    getMySubscription().then(setSubscription).catch(() => {});
+  }, []);
+
+  const fullName = meData?.full_name?.trim() || perfil.nome.trim() || 'Atleta';
+  const nomeDisplay = fullName.split(' ')[0];
 
   return (
     <SafeAreaView style={s.safe}>
@@ -160,6 +171,17 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </LinearGradient>
+
+        {/* ── Subscription pill ── */}
+        {subscription && (
+          <View style={s.subPill}>
+            <Ionicons name="shield-checkmark" size={13} color={Colors.primary} />
+            <Text style={s.subPillName}>{subscription.plan_name ?? 'Plano Ativo'}</Text>
+            <View style={s.subPillSep} />
+            <View style={s.subPillDot} />
+            <Text style={s.subPillStatus}>Ativo</Text>
+          </View>
+        )}
 
         {/* ── Acesso Rápido ── */}
         <Text style={s.sectionLabel}>ACESSO RÁPIDO</Text>
@@ -449,6 +471,24 @@ const s = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+
+  // Subscription pill
+  subPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary + '15',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
+  },
+  subPillName: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+  subPillSep: { width: 1, height: 10, backgroundColor: Colors.primary + '30' },
+  subPillDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.success },
+  subPillStatus: { fontSize: 11, fontWeight: '600', color: Colors.success },
 
   // Pill CTAs
   pill: {

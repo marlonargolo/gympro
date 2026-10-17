@@ -1,13 +1,32 @@
 // GymsAndProfessionalsMapViews — premium dark UI rewrite
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView, TextInput,
-  TouchableOpacity, Modal, FlatList,
+  TouchableOpacity, Modal, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
-import { mockAcademias, mockProfissionaisMapa } from '../data/mock-data';
-import type { Academia } from '../data/types';
+import { getNearbyGyms } from '@gympro/api';
+
+// SP fallback coords (expo-location not installed)
+const SP_LAT = -23.55;
+const SP_LNG = -46.63;
+
+interface Academia {
+  id: string;
+  nome: string;
+  endereco: string;
+  avaliacao: number;
+  modalidades: string[];
+  distance_km?: number;
+  is_open?: boolean;
+}
+
+const mockProfissionaisMapa = [
+  { id: '1', nome: 'Carlos Oliveira', especialidade: 'Personal Trainer', avaliacao: 4.8, precoConsultaAprox: 'R$ 80/h' },
+  { id: '2', nome: 'Ana Paula Silva', especialidade: 'Nutricionista Esportiva', avaliacao: 4.9, precoConsultaAprox: 'R$ 150/h' },
+  { id: '3', nome: 'Ricardo Santos', especialidade: 'Preparador Físico', avaliacao: 4.7, precoConsultaAprox: 'R$ 100/h' },
+];
 
 const MODALIDADES_OPCOES = [
   'Musculação', 'Crossfit', 'Yoga', 'Pilates', 'Natação',
@@ -18,8 +37,27 @@ type Tab = 'academias' | 'profissionais';
 
 export default function MapsScreen() {
   const [tab, setTab] = useState<Tab>('academias');
-  const [academias, setAcademias] = useState(mockAcademias);
+  const [academias, setAcademias] = useState<Academia[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    getNearbyGyms(SP_LAT, SP_LNG, 20)
+      .then((data: any[]) => {
+        const mapped: Academia[] = data.map(g => ({
+          id: String(g.id),
+          nome: g.name,
+          endereco: g.address,
+          avaliacao: g.avaliacao ?? 4.5,
+          modalidades: Array.isArray(g.modalidades) ? g.modalidades : [],
+          distance_km: g.distance_km,
+          is_open: g.is_open,
+        }));
+        setAcademias(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -74,10 +112,12 @@ export default function MapsScreen() {
         {tab === 'academias' ? (
           <>
             <Text style={s.sectionLabel}>
-              {academias.length} ACADEMIAS ENCONTRADAS
+              {loading ? 'BUSCANDO...' : `${academias.length} ACADEMIAS ENCONTRADAS`}
             </Text>
-            {academias.length === 0 ? (
-              <EmptyState icon="barbell-outline" text="Nenhuma academia cadastrada" />
+            {loading ? (
+              <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : academias.length === 0 ? (
+              <EmptyState icon="barbell-outline" text="Nenhuma academia encontrada" />
             ) : (
               academias.map(ac => <AcademiaCard key={ac.id} academia={ac} />)
             )}
@@ -115,7 +155,6 @@ export default function MapsScreen() {
 function AcademiaCard({ academia }: { academia: Academia }) {
   return (
     <View style={c.card}>
-      {/* top accent strip */}
       <View style={c.topStrip} />
       <View style={c.cardInner}>
         <View style={c.cardRow}>
@@ -126,9 +165,21 @@ function AcademiaCard({ academia }: { academia: Academia }) {
             <Text style={c.name}>{academia.nome}</Text>
             <Text style={c.address}>{academia.endereco}</Text>
           </View>
-          <View style={c.ratingChip}>
-            <Ionicons name="star" size={11} color={Colors.primary2} />
-            <Text style={c.ratingText}> {academia.avaliacao.toFixed(1)}</Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <View style={c.ratingChip}>
+              <Ionicons name="star" size={11} color={Colors.primary2} />
+              <Text style={c.ratingText}> {academia.avaliacao.toFixed(1)}</Text>
+            </View>
+            {academia.distance_km !== undefined && (
+              <Text style={c.distText}>{academia.distance_km.toFixed(1)} km</Text>
+            )}
+            {academia.is_open !== undefined && (
+              <View style={[c.openChip, { backgroundColor: academia.is_open ? Colors.success + '22' : '#FF6B6B22' }]}>
+                <Text style={[c.openText, { color: academia.is_open ? Colors.success : '#FF6B6B' }]}>
+                  {academia.is_open ? 'Aberta' : 'Fechada'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         {academia.modalidades.length > 0 && (
@@ -346,6 +397,9 @@ const c = StyleSheet.create({
     paddingHorizontal: 9, paddingVertical: 4,
   },
   tagText: { fontSize: 11, color: Colors.textTertiary, fontWeight: '600' },
+  distText: { fontSize: 11, color: Colors.textTertiary, fontWeight: '600' },
+  openChip: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  openText: { fontSize: 10, fontWeight: '700' },
   price: { fontSize: 14, fontWeight: '700', color: Colors.primary2 },
   agendarBtn: {
     backgroundColor: Colors.accent, borderRadius: 10,
