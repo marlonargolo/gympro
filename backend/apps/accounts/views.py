@@ -1,11 +1,12 @@
 import uuid
-from rest_framework import status, generics
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
 from .models import StudentProfile, ProfessionalProfile, InviteCode
 from .serializers import (
@@ -45,7 +46,6 @@ def login(request):
     user = serializer.validated_data['user']
     tokens = get_tokens(user)
 
-    # Get active subscription
     active_sub = None
     try:
         from apps.plans.models import Subscription
@@ -101,13 +101,20 @@ def change_password(request):
 
 # ── Students management (pro only) ──────────────────────────────────────────
 
+def _get_pro_students(prof):
+    """All students linked to this professional as trainer or nutritionist."""
+    return StudentProfile.objects.filter(
+        Q(personal_trainer=prof) | Q(nutritionist=prof)
+    ).distinct().select_related('user')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_students(request):
     if not request.user.is_professional:
         return Response({'detail': 'Acesso negado.'}, status=403)
     prof = request.user.professional_profile
-    students = StudentProfile.objects.filter(professional=prof).select_related('user')
+    students = _get_pro_students(prof)
     from .serializers import StudentProfileSerializer
     data = []
     for s in students:
@@ -122,13 +129,19 @@ def list_students(request):
 def student_detail(request, pk):
     if not request.user.is_professional:
         return Response({'detail': 'Acesso negado.'}, status=403)
+    prof = request.user.professional_profile
     try:
-        student = StudentProfile.objects.get(pk=pk, professional=request.user.professional_profile)
+        student = StudentProfile.objects.get(pk=pk)
+        if student.personal_trainer != prof and student.nutritionist != prof:
+            raise StudentProfile.DoesNotExist
     except StudentProfile.DoesNotExist:
         return Response({'detail': 'Aluno não encontrado.'}, status=404)
 
     if request.method == 'DELETE':
-        student.professional = None
+        if student.personal_trainer == prof:
+            student.personal_trainer = None
+        if student.nutritionist == prof:
+            student.nutritionist = None
         student.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -138,15 +151,74 @@ def student_detail(request, pk):
     return Response(d)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_ficha(request, pk):
+    """
+    Full student record.
+    Access: the student themselves, their personal_trainer, or their nutritionist.
+    """
+    try:
+        student = StudentProfile.objects.select_related('user', 'personal_trainer__user', 'nutritionist__user').get(pk=pk)
+    except StudentProfile.DoesNotExist:
+        return Response({'detail': 'Aluno não encontrado.'}, status=404)
+
+    user = request.user
+    prof = getattr(user, 'professional_profile', None)
+    is_own = user.is_student and student.user == user
+    is_linked_prof = prof and (student.personal_trainer == prof or student.nutritionist == prof)
+    if not (is_own or is_linked_prof):
+        return Response({'detail': 'Acesso negado.'}, status=403)
+
+    from apps.workouts.models import Treino, WorkoutLog
+    from apps.workouts.serializers import TreinoSerializer, WorkoutLogSerializer
+    from apps.nutrition.models import PlanoNutricional
+    from apps.nutrition.serializers import PlanoNutricionalSerializer
+    from apps.evolution.models import RegistroEvolucao
+    from apps.evolution.serializers import RegistroEvolucaoSerializer
+    from .serializers import StudentProfileSerializer
+
+    treinos = Treino.objects.filter(assigned_to=student)
+    logs = WorkoutLog.objects.filter(student=student).order_by('-started_at')[:20]
+    evolucao = RegistroEvolucao.objects.filter(student=student).order_by('-recorded_at')[:20]
+    nutri_plan = PlanoNutricional.objects.filter(student=student).first()
+
+    return Response({
+        'student': StudentProfileSerializer(student).data,
+        'user': UserSerializer(student.user, context={'request': request}).data,
+        'treinos': TreinoSerializer(treinos, many=True).data,
+        'workout_logs': WorkoutLogSerializer(logs, many=True).data,
+        'evolucao': RegistroEvolucaoSerializer(evolucao, many=True).data,
+        'plano_nutricional': PlanoNutricionalSerializer(nutri_plan).data if nutri_plan else None,
+        'personal_trainer': {
+            'name': student.personal_trainer.user.full_name,
+            'cref': student.personal_trainer.cref,
+        } if student.personal_trainer else None,
+        'nutritionist': {
+            'name': student.nutritionist.user.full_name,
+            'crn': student.nutritionist.crn,
+        } if student.nutritionist else None,
+    })
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_invite(request):
     if not request.user.is_professional:
         return Response({'detail': 'Acesso negado.'}, status=403)
+    prof = request.user.professional_profile
+    connection_type = request.data.get('connection_type', 'personal_trainer')
+
+    if connection_type == 'personal_trainer' and not prof.is_personal_trainer:
+        return Response({'detail': 'Você não é personal trainer.'}, status=400)
+    if connection_type == 'nutritionist' and not prof.is_nutritionist:
+        return Response({'detail': 'Você não é nutricionista.'}, status=400)
+
     code = str(uuid.uuid4())[:8].upper()
     invite = InviteCode.objects.create(
-        professional=request.user.professional_profile,
+        professional=prof,
         code=code,
+        connection_type=connection_type,
     )
     return Response(InviteCodeSerializer(invite).data, status=status.HTTP_201_CREATED)
 
@@ -158,15 +230,26 @@ def use_invite(request):
         return Response({'detail': 'Apenas alunos podem usar convites.'}, status=403)
     code = request.data.get('code', '').upper()
     try:
-        invite = InviteCode.objects.get(code=code, used_by=None)
+        invite = InviteCode.objects.select_related('professional').get(code=code, used_by=None)
     except InviteCode.DoesNotExist:
         return Response({'detail': 'Código inválido ou já utilizado.'}, status=400)
+
     student = request.user.student_profile
-    student.professional = invite.professional
+    conn_type = invite.connection_type
+
+    if conn_type == 'personal_trainer':
+        if student.personal_trainer_id:
+            return Response({'detail': 'Você já tem um personal trainer vinculado.'}, status=400)
+        student.personal_trainer = invite.professional
+    elif conn_type == 'nutritionist':
+        if student.nutritionist_id:
+            return Response({'detail': 'Você já tem um nutricionista vinculado.'}, status=400)
+        student.nutritionist = invite.professional
+
     student.save()
     invite.used_by = student
     invite.save()
-    return Response({'detail': 'Vinculado ao profissional com sucesso.'})
+    return Response({'detail': f'Vinculado ao {invite.professional.user.full_name} como {conn_type}.'})
 
 
 # ── Admin stats ──────────────────────────────────────────────────────────────
@@ -174,7 +257,7 @@ def use_invite(request):
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def admin_overview(request):
-    from django.db.models import Sum, Count
+    from django.db.models import Sum
     from apps.plans.models import Subscription
     from apps.payments.models import Payment
 

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'apps.social',
     'apps.integrations',
     'apps.notifications',
+    'apps.connections',
 ]
 
 MIDDLEWARE = [

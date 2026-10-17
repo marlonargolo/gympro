@@ -14,12 +14,34 @@ from . import instagram as ig_client
 @permission_classes([IsAuthenticated])
 def feed_list(request):
     if request.method == 'GET':
-        posts = FeedPost.objects.filter(is_public=True).select_related('author')
+        discover = request.query_params.get('discover')
+        mine = request.query_params.get('mine')
+
+        if mine:
+            posts = FeedPost.objects.filter(author=request.user).select_related('author')
+        elif discover in ('personal_trainer', 'nutritionist', 'student'):
+            posts = FeedPost.objects.filter(
+                is_public=True, post_role=discover
+            ).select_related('author')
+        else:
+            posts = FeedPost.objects.filter(is_public=True).select_related('author')
+
         return Response(FeedPostSerializer(posts, many=True, context={'request': request}).data)
 
     serializer = FeedPostSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
-    post = serializer.save(author=request.user)
+    # Infer post_role from author's user_type
+    post_role = 'student'
+    if request.user.is_professional:
+        prof = getattr(request.user, 'professional_profile', None)
+        if prof:
+            if prof.is_personal_trainer and prof.is_nutritionist:
+                post_role = request.data.get('post_role', 'personal_trainer')
+            elif prof.is_personal_trainer:
+                post_role = 'personal_trainer'
+            elif prof.is_nutritionist:
+                post_role = 'nutritionist'
+    post = serializer.save(author=request.user, post_role=post_role)
     return Response(FeedPostSerializer(post, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 

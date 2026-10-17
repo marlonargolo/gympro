@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/students/', include('apps.accounts.student_urls')),
     path('api/subscriptions/', include('apps.plans.subscription_urls')),
     path('api/admin-stats/', include('apps.accounts.admin_urls')),
+    path('api/connections/', include('apps.connections.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

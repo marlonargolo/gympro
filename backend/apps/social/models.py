@@ -11,10 +11,17 @@ class FeedPost(models.Model):
         ('conquista', 'Conquista'),
     ]
 
+    POST_ROLE_CHOICES = [
+        ('personal_trainer', 'Personal Trainer'),
+        ('nutritionist', 'Nutricionista'),
+        ('student', 'Aluno'),
+    ]
+
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feed_posts')
     caption = models.TextField()
     media_url = models.URLField(blank=True)
     tipo = models.CharField(choices=TIPO_CHOICES, max_length=20)
+    post_role = models.CharField(choices=POST_ROLE_CHOICES, max_length=20, default='student')
     likes_count = models.IntegerField(default=0)
     liked_by = models.ManyToManyField(User, blank=True, related_name='liked_posts')
     is_public = models.BooleanField(default=True)

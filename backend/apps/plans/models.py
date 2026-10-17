@@ -8,7 +8,9 @@ User = get_user_model()
 class Plan(models.Model):
     PLAN_TYPE_CHOICES = [
         ('student', 'Aluno'),
-        ('professional', 'Profissional'),
+        ('personal_trainer', 'Personal Trainer'),
+        ('nutritionist', 'Nutricionista'),
+        ('professional_combined', 'Personal + Nutricionista'),
     ]
 
     name = models.CharField(max_length=100)

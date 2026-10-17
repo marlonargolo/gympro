@@ -1,20 +1,33 @@
 from rest_framework import serializers
-from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import User, StudentProfile, ProfessionalProfile, InviteCode
-
-
-class StudentProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StudentProfile
-        exclude = ['user', 'fcm_token', 'spotify_access_token']
-        read_only_fields = ['professional']
 
 
 class ProfessionalProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProfessionalProfile
         exclude = ['user', 'instagram_token', 'spotify_access_token', 'spotify_refresh_token', 'fcm_token']
+        read_only_fields = ['trainer_student_count', 'nutritionist_student_count']
+
+
+class StudentProfileSerializer(serializers.ModelSerializer):
+    personal_trainer_name = serializers.SerializerMethodField()
+    nutritionist_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentProfile
+        exclude = ['user', 'fcm_token']
+        read_only_fields = ['personal_trainer', 'nutritionist']
+
+    def get_personal_trainer_name(self, obj):
+        if obj.personal_trainer_id:
+            return obj.personal_trainer.user.full_name
+        return None
+
+    def get_nutritionist_name(self, obj):
+        if obj.nutritionist_id:
+            return obj.nutritionist.user.full_name
+        return None
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -40,7 +53,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8)
+    password = serializers.CharField(write_only=True, min_length=6)
     full_name = serializers.CharField(max_length=200)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     user_type = serializers.ChoiceField(choices=['student', 'professional'])
@@ -49,14 +62,25 @@ class RegisterSerializer(serializers.Serializer):
     sexo = serializers.CharField(required=False, default='masculino')
     fitness_goal = serializers.CharField(required=False, default='hipertrofia')
     # Pro fields
-    cref = serializers.CharField(required=False, allow_blank=True)
-    gym_name = serializers.CharField(required=False, allow_blank=True)
-    specialty = serializers.CharField(required=False, allow_blank=True)
+    is_personal_trainer = serializers.BooleanField(required=False, default=False)
+    is_nutritionist = serializers.BooleanField(required=False, default=False)
+    cref = serializers.CharField(required=False, allow_blank=True, default='')
+    crn = serializers.CharField(required=False, allow_blank=True, default='')
+    gym_name = serializers.CharField(required=False, allow_blank=True, default='')
+    specialty = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError('Este e-mail já está cadastrado.')
         return value
+
+    def validate(self, data):
+        if data.get('user_type') == 'professional':
+            if not data.get('is_personal_trainer') and not data.get('is_nutritionist'):
+                raise serializers.ValidationError(
+                    'Selecione ao menos uma especialidade: Personal Trainer ou Nutricionista.'
+                )
+        return data
 
     def create(self, validated_data):
         user_type = validated_data['user_type']
@@ -77,7 +101,10 @@ class RegisterSerializer(serializers.Serializer):
         else:
             ProfessionalProfile.objects.create(
                 user=user,
+                is_personal_trainer=validated_data.get('is_personal_trainer', False),
+                is_nutritionist=validated_data.get('is_nutritionist', False),
                 cref=validated_data.get('cref', ''),
+                crn=validated_data.get('crn', ''),
                 gym_name=validated_data.get('gym_name', ''),
                 specialty=validated_data.get('specialty', ''),
             )
@@ -100,7 +127,7 @@ class LoginSerializer(serializers.Serializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True, min_length=8)
+    new_password = serializers.CharField(write_only=True, min_length=6)
 
     def validate_old_password(self, value):
         user = self.context['request'].user
@@ -137,5 +164,5 @@ class UpdateProfileSerializer(serializers.ModelSerializer):
 class InviteCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = InviteCode
-        fields = ['code', 'created_at', 'expires_at', 'used_by']
+        fields = ['code', 'connection_type', 'created_at', 'expires_at', 'used_by']
         read_only_fields = ['code', 'created_at', 'used_by']
