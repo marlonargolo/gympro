@@ -2,6 +2,13 @@ from rest_framework import serializers
 from .models import ConnectionRequest
 
 
+class CreateConnectionRequestSerializer(serializers.Serializer):
+    connection_type = serializers.ChoiceField(choices=['personal_trainer', 'nutritionist'])
+    message = serializers.CharField(required=False, allow_blank=True, default='')
+    target_professional_id = serializers.IntegerField(required=False)
+    target_student_id = serializers.IntegerField(required=False)
+
+
 class ConnectionRequestSerializer(serializers.ModelSerializer):
     requester_name = serializers.SerializerMethodField()
     target_name = serializers.SerializerMethodField()

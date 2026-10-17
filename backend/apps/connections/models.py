@@ -52,3 +52,44 @@ class ConnectionRequest(models.Model):
         requester = self.requester_student or self.requester_professional
         target = self.target_student or self.target_professional
         return f'{requester} → {target} ({self.connection_type}, {self.status})'
+
+    def accept(self):
+        from django.utils import timezone
+        from django.core.exceptions import ValidationError
+
+        student = self.requester_student or self.target_student
+        professional = self.requester_professional or self.target_professional
+
+        if not student or not professional:
+            raise ValidationError('Solicitação incompleta: aluno ou profissional ausente.')
+
+        if self.connection_type == 'personal_trainer':
+            if student.personal_trainer_id:
+                raise ValidationError('Aluno já possui um personal trainer.')
+            student.personal_trainer = professional
+        elif self.connection_type == 'nutritionist':
+            if student.nutritionist_id:
+                raise ValidationError('Aluno já possui um nutricionista.')
+            student.nutritionist = professional
+
+        student.save(update_fields=['personal_trainer' if self.connection_type == 'personal_trainer' else 'nutritionist'])
+        self.status = 'accepted'
+        self.responded_at = timezone.now()
+        self.save(update_fields=['status', 'responded_at'])
+
+        try:
+            from apps.notifications.fcm import notify_user
+            notify_user(
+                student.user,
+                title='Conexão aceita!',
+                body=f'Você foi vinculado a {professional.user.full_name}.',
+                data={'type': 'connection', 'connection_type': self.connection_type},
+            )
+            notify_user(
+                professional.user,
+                title='Novo aluno!',
+                body=f'{student.user.full_name} foi vinculado à sua conta.',
+                data={'type': 'connection', 'connection_type': self.connection_type},
+            )
+        except Exception:
+            pass
