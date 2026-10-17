@@ -162,3 +162,41 @@ export async function getAdminStats() {
   const resp = await api.get('/api/admin-stats/');
   return resp.data;
 }
+
+// Connections
+export async function getConnections(status?: string) {
+  const resp = await api.get('/api/connections/', { params: status ? { status } : undefined });
+  return resp.data;
+}
+
+export async function requestConnection(data: {
+  connection_type: 'personal_trainer' | 'nutritionist';
+  message?: string;
+  target_professional_id?: number;
+  target_student_id?: number;
+}) {
+  const resp = await api.post('/api/connections/request/', data);
+  return resp.data;
+}
+
+export async function acceptConnection(id: number) {
+  const resp = await api.post(`/api/connections/${id}/accept/`);
+  return resp.data;
+}
+
+export async function rejectConnection(id: number) {
+  const resp = await api.post(`/api/connections/${id}/reject/`);
+  return resp.data;
+}
+
+export async function unlinkStudent(studentId: number, connectionType?: 'personal_trainer' | 'nutritionist') {
+  const resp = await api.delete(`/api/connections/${studentId}/unlink/`, {
+    data: connectionType ? { connection_type: connectionType } : undefined,
+  });
+  return resp.data;
+}
+
+export async function getStudentFicha(studentId: number) {
+  const resp = await api.get(`/api/students/${studentId}/ficha/`);
+  return resp.data;
+}
