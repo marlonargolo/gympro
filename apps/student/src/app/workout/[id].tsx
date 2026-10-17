@@ -1,21 +1,54 @@
-// WorkoutDetailView + WorkoutSessionView — premium dark UI rewrite
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FlatList, View, Text, TouchableOpacity, StyleSheet, Modal, SafeAreaView,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
-import { useStore } from '../../context/StoreContext';
-import { metodoTreinamentoInfo } from '../../data/types';
-import type { Treino, Exercicio, WatchNotification } from '../../data/types';
+import { getWorkout, logWorkout } from '@gympro/api';
+
+interface Exercicio {
+  id: string | number;
+  nome: string;
+  grupo_muscular?: string;
+  series: number;
+  repeticoes: number | string;
+  observacoes?: string;
+  metodo?: string;
+}
+
+interface Treino {
+  id: string;
+  titulo: string;
+  duracao_estimada_min: number;
+  nivel: string;
+  exercicios: Exercicio[];
+}
 
 export default function WorkoutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { treinos, addWatchNotification } = useStore();
+  const [treino, setTreino] = useState<Treino | null>(null);
+  const [loading, setLoading] = useState(true);
   const [sessionOpen, setSessionOpen] = useState(false);
 
-  const treino = treinos.find(t => t.id === id);
+  useEffect(() => {
+    if (!id) return;
+    getWorkout(String(id))
+      .then(setTreino)
+      .catch(() => setTreino(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!treino) {
     return (
@@ -23,6 +56,9 @@ export default function WorkoutDetailScreen() {
         <View style={s.center}>
           <Ionicons name="alert-circle-outline" size={52} color={Colors.textTertiary} />
           <Text style={s.notFoundText}>Treino não encontrado.</Text>
+          <TouchableOpacity style={s.backLink} onPress={() => router.back()}>
+            <Text style={s.backLinkText}>Voltar</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -30,7 +66,6 @@ export default function WorkoutDetailScreen() {
 
   const ListHeader = (
     <>
-      {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={Colors.primary} />
@@ -40,18 +75,16 @@ export default function WorkoutDetailScreen() {
         </View>
         <View style={s.durationBadge}>
           <Ionicons name="time" size={12} color={Colors.primary2} />
-          <Text style={s.durationBadgeText}>{treino.duracaoEstimadaMin}min</Text>
+          <Text style={s.durationBadgeText}>{treino.duracao_estimada_min}min</Text>
         </View>
       </View>
 
-      {/* ── Stat chips row ── */}
       <View style={s.statsRow}>
-        <StatChip label="DURAÇÃO" value={`${treino.duracaoEstimadaMin} min`} icon="time-outline" />
-        <StatChip label="NÍVEL" value={treino.nivel} icon="stats-chart-outline" />
+        <StatChip label="DURAÇÃO" value={`${treino.duracao_estimada_min} min`} icon="time-outline" />
+        <StatChip label="NÍVEL" value={treino.nivel ?? '—'} icon="stats-chart-outline" />
         <StatChip label="EXERCÍCIOS" value={`${treino.exercicios.length}`} icon="barbell-outline" />
       </View>
 
-      {/* ── Section label ── */}
       <Text style={s.sectionLabel}>EXERCÍCIOS</Text>
     </>
   );
@@ -60,16 +93,15 @@ export default function WorkoutDetailScreen() {
     <SafeAreaView style={s.safe}>
       <FlatList<Exercicio>
         data={treino.exercicios}
-        keyExtractor={(ex: Exercicio) => ex.id}
+        keyExtractor={(ex) => String(ex.id)}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={ListHeader}
-        renderItem={({ item: ex, index }: { item: Exercicio; index: number }) => (
+        renderItem={({ item: ex, index }) => (
           <ExercicioCard ex={ex} index={index} />
         )}
         ListFooterComponent={
           <>
-            {/* ── Start button ── */}
             <TouchableOpacity
               style={s.startBtn}
               onPress={() => setSessionOpen(true)}
@@ -87,16 +119,23 @@ export default function WorkoutDetailScreen() {
         treino={treino}
         visible={sessionOpen}
         onClose={() => setSessionOpen(false)}
-        onNotify={addWatchNotification}
+        onComplete={async () => {
+          try {
+            await logWorkout(String(treino.id), {
+              completed: true,
+              exercicios_realizados: treino.exercicios.length,
+            });
+          } catch {
+            // log failure is non-blocking
+          }
+          setSessionOpen(false);
+        }}
       />
     </SafeAreaView>
   );
 }
 
-// ─── ExercicioCard ────────────────────────────────────────────────────────────
-
 function ExercicioCard({ ex, index }: { ex: Exercicio; index: number }) {
-  const metodoInfo = ex.metodo ? metodoTreinamentoInfo[ex.metodo] : null;
   return (
     <View style={c.card}>
       <View style={c.cardTop}>
@@ -105,7 +144,7 @@ function ExercicioCard({ ex, index }: { ex: Exercicio; index: number }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={c.exName}>{ex.nome}</Text>
-          <Text style={c.exMuscle}>{ex.grupoMuscular}</Text>
+          <Text style={c.exMuscle}>{ex.grupo_muscular ?? ''}</Text>
         </View>
       </View>
       <View style={c.pillsRow}>
@@ -117,9 +156,9 @@ function ExercicioCard({ ex, index }: { ex: Exercicio; index: number }) {
           <Text style={c.infoPillLabel}>Reps</Text>
           <Text style={c.infoPillValue}>{ex.repeticoes}</Text>
         </View>
-        {metodoInfo && (
+        {ex.metodo && (
           <View style={c.metodoBadge}>
-            <Text style={c.metodoText}>{metodoInfo.titulo.toUpperCase()}</Text>
+            <Text style={c.metodoText}>{ex.metodo.toUpperCase()}</Text>
           </View>
         )}
       </View>
@@ -129,8 +168,6 @@ function ExercicioCard({ ex, index }: { ex: Exercicio; index: number }) {
     </View>
   );
 }
-
-// ─── StatChip ─────────────────────────────────────────────────────────────────
 
 function StatChip({ label, value, icon }: {
   label: string;
@@ -146,36 +183,21 @@ function StatChip({ label, value, icon }: {
   );
 }
 
-// ─── WorkoutSession Modal ─────────────────────────────────────────────────────
-
 function WorkoutSession({
-  treino, visible, onClose, onNotify,
+  treino, visible, onClose, onComplete,
 }: {
   treino: Treino;
   visible: boolean;
   onClose: () => void;
-  onNotify: (n: WatchNotification) => void;
+  onComplete: () => void;
 }) {
   const [indice, setIndice] = useState(0);
 
   function avancar() {
-    const ex = treino.exercicios[indice];
-    onNotify({
-      id: Date.now().toString(),
-      titulo: 'Série concluída 💪',
-      corpo: `${ex.nome} — próxima em breve`,
-      data: new Date(),
-    });
     if (indice < treino.exercicios.length - 1) {
       setIndice(i => i + 1);
     } else {
       setIndice(treino.exercicios.length);
-      onNotify({
-        id: Date.now().toString() + 'f',
-        titulo: 'Treino finalizado 🎉',
-        corpo: treino.titulo,
-        data: new Date(),
-      });
     }
   }
 
@@ -186,12 +208,10 @@ function WorkoutSession({
 
   const done = indice >= treino.exercicios.length;
   const ex = done ? null : treino.exercicios[indice];
-  const metodoInfo = ex?.metodo ? metodoTreinamentoInfo[ex.metodo] : null;
 
   return (
     <Modal visible={visible} animationType="slide">
       <SafeAreaView style={ws.safe}>
-        {/* Header */}
         <View style={ws.header}>
           {done ? (
             <Text style={ws.headerLabel}>Sessão completa</Text>
@@ -205,22 +225,19 @@ function WorkoutSession({
           </TouchableOpacity>
         </View>
 
-        {/* Progress bar */}
         {!done && (
           <View style={ws.progressTrack}>
             <View
               style={[
                 ws.progressFill,
-                { width: `${((indice) / treino.exercicios.length) * 100}%` },
+                { width: `${(indice / treino.exercicios.length) * 100}%` },
               ]}
             />
           </View>
         )}
 
-        {/* Body */}
         <View style={ws.body}>
           {done ? (
-            // ── Completion screen ──
             <View style={ws.doneContainer}>
               <Text style={ws.trophy}>🏆</Text>
               <Text style={ws.doneTitle}>Treino concluído!</Text>
@@ -228,19 +245,18 @@ function WorkoutSession({
               <Text style={ws.doneDetail}>
                 {treino.exercicios.length} exercícios completados
               </Text>
-              <TouchableOpacity style={ws.btn} onPress={fechar} activeOpacity={0.85}>
-                <Text style={ws.btnText}>Fechar</Text>
+              <TouchableOpacity style={ws.btn} onPress={onComplete} activeOpacity={0.85}>
+                <Text style={ws.btnText}>Salvar e fechar</Text>
               </TouchableOpacity>
             </View>
           ) : ex ? (
-            // ── Exercise screen ──
             <View style={ws.exContainer}>
               <View style={ws.exIndexRow}>
                 <Text style={ws.exIndex}>{indice + 1}</Text>
                 <Text style={ws.exIndexOf}>/{treino.exercicios.length}</Text>
               </View>
               <Text style={ws.exName}>{ex.nome}</Text>
-              <Text style={ws.exMuscle}>{ex.grupoMuscular}</Text>
+              <Text style={ws.exMuscle}>{ex.grupo_muscular ?? ''}</Text>
 
               <View style={ws.setsRow}>
                 <View style={ws.setChip}>
@@ -254,9 +270,9 @@ function WorkoutSession({
                 </View>
               </View>
 
-              {metodoInfo && (
+              {ex.metodo && (
                 <View style={ws.metodoBadge}>
-                  <Text style={ws.metodoText}>{metodoInfo.titulo}</Text>
+                  <Text style={ws.metodoText}>{ex.metodo}</Text>
                 </View>
               )}
 
@@ -278,12 +294,12 @@ function WorkoutSession({
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   notFoundText: { fontSize: 16, color: Colors.textSecondary },
+  backLink: { marginTop: 8 },
+  backLinkText: { color: Colors.primary, fontWeight: '600', fontSize: 15 },
 
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
 
@@ -305,9 +321,7 @@ const s = StyleSheet.create({
   },
   durationBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary2 },
 
-  statsRow: {
-    flexDirection: 'row', gap: 8, marginBottom: 20,
-  },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   statChip: {
     flex: 1, backgroundColor: Colors.surfaceElevated, borderRadius: 12,
     padding: 12, gap: 3, alignItems: 'center',

@@ -1,29 +1,44 @@
-// WorkoutsScreen — premium dark UI rewrite
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  ScrollView, FlatList,
+  ScrollView, FlatList, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
-import { useStore } from '../../context/StoreContext';
-import type { ModalidadeAtleta, Treino } from '../../data/types';
-import { modalidadeLabel } from '../../data/types';
+import { getWorkouts } from '@gympro/api';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+type Modalidade = 'corredor' | 'futebol' | 'musculacao' | 'ciclista' | 'natacao' | 'crossTraining';
 
-const allModalidades: ModalidadeAtleta[] = [
+const modalidadeLabel: Record<string, string> = {
+  corredor: 'Corrida',
+  futebol: 'Futebol',
+  musculacao: 'Musculação',
+  ciclista: 'Ciclismo',
+  natacao: 'Natação',
+  crossTraining: 'Cross Training',
+};
+
+const allModalidades: Modalidade[] = [
   'corredor', 'futebol', 'musculacao', 'ciclista', 'natacao', 'crossTraining',
 ];
+
+interface ApiWorkout {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  exercicios: object[];
+  duracao_estimada_min: number;
+  modalidade: string;
+  nivel: string;
+  assigned_to?: object | null;
+}
 
 function duracaoColor(min: number): string {
   if (min < 45) return Colors.success;
   if (min < 60) return Colors.primary2;
   return Colors.primary;
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FilterChip({
   titulo, ativo, onPress,
@@ -64,8 +79,8 @@ function FilterChip({
   );
 }
 
-function WorkoutCard({ item }: { item: Treino }) {
-  const color = duracaoColor(item.duracaoEstimadaMin);
+function WorkoutCard({ item }: { item: ApiWorkout }) {
+  const color = duracaoColor(item.duracao_estimada_min);
   const exCount = item.exercicios.length;
 
   return (
@@ -74,7 +89,6 @@ function WorkoutCard({ item }: { item: Treino }) {
       onPress={() => router.navigate(`/workout/${item.id}` as any)}
       style={card.wrap}
     >
-      {/* orange / colored accent strip */}
       <View
         style={[
           card.strip,
@@ -88,12 +102,11 @@ function WorkoutCard({ item }: { item: Treino }) {
           },
         ]}
       />
-      {/* card body */}
       <View style={card.body}>
         <View style={card.left}>
           <Text style={card.title}>{item.titulo}</Text>
           <Text style={card.sub}>
-            {modalidadeLabel[item.modalidade]} · {item.nivel}
+            {modalidadeLabel[item.modalidade] ?? item.modalidade} · {item.nivel}
           </Text>
           <Text style={card.exCount}>
             {exCount} exercício{exCount !== 1 ? 's' : ''}
@@ -108,7 +121,7 @@ function WorkoutCard({ item }: { item: Treino }) {
           >
             <Ionicons name="time-outline" size={11} color={color} style={{ marginRight: 3 }} />
             <Text style={[card.badgeText, { color }]}>
-              {item.duracaoEstimadaMin}min
+              {item.duracao_estimada_min}min
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
@@ -118,19 +131,24 @@ function WorkoutCard({ item }: { item: Treino }) {
   );
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function WorkoutsScreen() {
-  const { treinos } = useStore();
-  const [filtro, setFiltro] = useState<ModalidadeAtleta | null>(null);
+  const [workouts, setWorkouts] = useState<ApiWorkout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState<Modalidade | null>(null);
+
+  useEffect(() => {
+    getWorkouts()
+      .then((data: ApiWorkout[]) => setWorkouts(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const treinosFiltrados = filtro
-    ? treinos.filter(t => t.modalidade === filtro)
-    : treinos;
+    ? workouts.filter(t => t.modalidade === filtro)
+    : workouts;
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* ── Header ── */}
       <View style={s.header}>
         <Text style={s.headerTitle}>Treinos</Text>
         <TouchableOpacity
@@ -142,44 +160,47 @@ export default function WorkoutsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Filter chips ── */}
       <View style={s.chipsWrap}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.chipsRow}
-      >
-        <FilterChip titulo="Todos" ativo={filtro === null} onPress={() => setFiltro(null)} />
-        {allModalidades.map(m => (
-          <FilterChip
-            key={m}
-            titulo={modalidadeLabel[m]}
-            ativo={filtro === m}
-            onPress={() => setFiltro(m)}
-          />
-        ))}
-      </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.chipsRow}
+        >
+          <FilterChip titulo="Todos" ativo={filtro === null} onPress={() => setFiltro(null)} />
+          {allModalidades.map(m => (
+            <FilterChip
+              key={m}
+              titulo={modalidadeLabel[m]}
+              ativo={filtro === m}
+              onPress={() => setFiltro(m)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
-      {/* ── Workout list ── */}
-      <FlatList<Treino>
-        data={treinosFiltrados}
-        keyExtractor={(item: Treino) => item.id}
-        contentContainerStyle={s.list}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }: { item: Treino }) => <WorkoutCard item={item} />}
-        ListEmptyComponent={
-          <View style={s.emptyWrap}>
-            <Ionicons name="barbell-outline" size={40} color={Colors.textTertiary} />
-            <Text style={s.emptyText}>Nenhum treino encontrado</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={s.center}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+        </View>
+      ) : (
+        <FlatList<ApiWorkout>
+          data={treinosFiltrados}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => <WorkoutCard item={item} />}
+          ListEmptyComponent={
+            <View style={s.emptyWrap}>
+              <Ionicons name="barbell-outline" size={40} color={Colors.textTertiary} />
+              <Text style={s.emptyText}>Nenhum treino encontrado</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
 
-// ─── Chip styles ──────────────────────────────────────────────────────────────
 const chip = StyleSheet.create({
   base: {
     paddingHorizontal: 14,
@@ -198,7 +219,6 @@ const chip = StyleSheet.create({
   },
 });
 
-// ─── Card styles ──────────────────────────────────────────────────────────────
 const card = StyleSheet.create({
   wrap: {
     backgroundColor: Colors.surface,
@@ -259,7 +279,6 @@ const card = StyleSheet.create({
   },
 });
 
-// ─── Screen styles ────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
@@ -300,6 +319,12 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 54,
+  },
+
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   list: {
